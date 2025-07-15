@@ -102,7 +102,7 @@ class LumaPhotonDepth2Img:
             
             print("Creating generation...")
             generation = await client.generations.image.create(
-                prompt=prompt, image_reference_url=upload_result.download_url, seed=seed, guidance_scale=guidance_scale
+                prompt=prompt, image_ref=[{"url": upload_result.download_url}], seed=seed, guidance_scale=guidance_scale
             )
 
             print(f"Polling generation ID: {generation.id}")
@@ -112,9 +112,9 @@ class LumaPhotonDepth2Img:
                 print(f"Generation state: {generation.state}")
 
             if generation.state == "failed":
-                raise Exception(f"Luma API generation failed: {generation.result.get('reason', 'Unknown')}")
+                raise Exception(f"Luma API generation failed: {generation.failure_reason}")
 
-            result_image_url = generation.images[0].url
+            result_image_url = generation.assets.image
             print(f"Downloading result from {result_image_url}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(result_image_url) as resp:
