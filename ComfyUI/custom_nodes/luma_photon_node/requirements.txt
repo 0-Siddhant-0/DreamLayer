@@ -1,0 +1,4 @@
+luma-ai
+timm
+opencv-python
+aiohttp
