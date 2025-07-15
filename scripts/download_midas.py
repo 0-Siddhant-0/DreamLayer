@@ -3,7 +3,9 @@ import os
 
 # Define a predictable directory for the cache within the workspace
 # This path should be relative to the repository root.
-torch_hub_dir = os.path.join(os.getcwd(), 'torch_hub_cache')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(script_dir)
+torch_hub_dir = os.path.join(repo_root, 'torch_hub_cache')
 os.environ['TORCH_HOME'] = torch_hub_dir
 os.makedirs(torch_hub_dir, exist_ok=True)
 

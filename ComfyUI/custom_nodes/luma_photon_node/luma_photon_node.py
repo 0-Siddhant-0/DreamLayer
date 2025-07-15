@@ -3,7 +3,8 @@ import torch
 import numpy as np
 from PIL import Image
 import os
-import io
+import os
+import uuid
 import uuid
 import requests
 
@@ -132,6 +133,9 @@ class LumaPhotonDepth2Img:
         depth_map_to_return = torch.zeros_like(image)
         if not disable_depth:
             print("Running MiDaS depth estimation...")
+            # Ensure image tensor has the expected shape
+            if image.dim() != 4 or image.shape[0] != 1:
+                raise ValueError(f"Expected image tensor with shape [1, H, W, C], got {image.shape}")
             img_np = (image.squeeze().numpy() * 255).astype(np.uint8)
             
             try:
@@ -161,9 +165,13 @@ class LumaPhotonDepth2Img:
             output_dir = os.path.join(folder_paths.get_output_directory(), "depth")
             os.makedirs(output_dir, exist_ok=True)
             
-            depth_map_normalized = (depth_map_tensor - depth_map_tensor.min()) / (
-                depth_map_tensor.max() - depth_map_tensor.min()
-            )
+            depth_min = depth_map_tensor.min()
+            depth_max = depth_map_tensor.max()
+            if depth_max - depth_min > 1e-8:
+                depth_map_normalized = (depth_map_tensor - depth_min) / (depth_max - depth_min)
+            else:
+                # Handle constant depth map
+                depth_map_normalized = torch.zeros_like(depth_map_tensor)
             depth_map_img = Image.fromarray(
                 (depth_map_normalized * 255).numpy().astype(np.uint8)
             )
@@ -220,6 +228,11 @@ class LumaPhotonDepth2Img:
         )
         response_poll = operation.execute()
 
-        img_response = requests.get(response_poll.assets.image)
-        img = process_image_response(img_response)
-        return (img, depth_map_to_return)
+        try:
+            img_response = requests.get(response_poll.assets.image)
+            img_response.raise_for_status()
+            img = process_image_response(img_response)
+            return (img, depth_map_to_return)
+        except requests.RequestException as e:
+            logger.error(f"Failed to download generated image: {e}")
+            return (None, depth_map_to_return)
