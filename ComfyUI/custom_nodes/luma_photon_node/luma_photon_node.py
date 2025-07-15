@@ -130,7 +130,7 @@ class LumaPhotonDepth2Img:
 
         if not kwargs.get("comfy_api_key"):
             print("No API key provided. Skipping Luma API call and returning depth map.")
-            return (image, depth_map_to_return)
+            return (None, depth_map_to_return)
 
         print("Calling Luma Photon API...")
         auth_kwargs = kwargs
