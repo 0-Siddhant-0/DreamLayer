@@ -28,7 +28,7 @@ from comfy_api_nodes.apinode_utils import (
 )
 
 # Helper to convert a PIL Image to a tensor
-def pil_to_tensor(image):
+def pil_to_tensor(image: Image.Image) -> torch.Tensor:
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 def image_result_url_extractor(response: LumaGeneration):
@@ -41,7 +41,13 @@ class LumaPhotonDepth2Img:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True, "default": "A beautiful, photorealistic image"}),
+                "prompt": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "A beautiful, photorealistic image",
+                    },
+                ),
                 "image_weight": (
                     "FLOAT",
                     {
@@ -49,7 +55,10 @@ class LumaPhotonDepth2Img:
                         "min": 0.0,
                         "max": 0.98,
                         "step": 0.01,
-                        "tooltip": "Weight of the image; the closer to 1.0, the less the image will be modified.",
+                        "tooltip": (
+                            "Weight of the image; the closer to 1.0, the less the "
+                            "image will be modified."
+                        ),
                     },
                 ),
                 "model": ([model.value for model in LumaImageModel],),
@@ -60,10 +69,20 @@ class LumaPhotonDepth2Img:
                         "min": 0,
                         "max": 0xFFFFFFFFFFFFFFFF,
                         "control_after_generate": True,
-                        "tooltip": "Seed to determine if node should re-run; actual results are nondeterministic regardless of seed.",
+                        "tooltip": (
+                            "Seed to determine if node should re-run; actual "
+                            "results are nondeterministic regardless of seed."
+                        ),
                     },
                 ),
-                "disable_depth": ("BOOLEAN", {"default": False, "label_on": "depth disabled", "label_off": "depth enabled"}),
+                "disable_depth": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "label_on": "depth disabled",
+                        "label_off": "depth enabled",
+                    },
+                ),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -77,10 +96,22 @@ class LumaPhotonDepth2Img:
     FUNCTION = "generate_novel_view"
     CATEGORY = "DreamLayer/API"
 
-    def generate_novel_view(self, image: torch.Tensor, prompt: str, image_weight: float, model: str, seed: int, disable_depth: bool, unique_id: str = None, **kwargs):
+    def generate_novel_view(
+        self,
+        image: torch.Tensor,
+        prompt: str,
+        image_weight: float,
+        model: str,
+        seed: int,
+        disable_depth: bool,
+        unique_id: str = None,
+        **kwargs,
+    ) -> tuple[torch.Tensor | None, torch.Tensor]:
         """
-        This function generates a novel-view image using the Luma Photon API, with an
-        optional local depth estimation step using MiDaS.
+        Generates a novel-view image using the Luma Photon API.
+
+        This node can optionally run a local MiDaS model to estimate a depth map
+        from the input image.
 
         Args:
             image (torch.Tensor): The input image tensor.
@@ -88,8 +119,15 @@ class LumaPhotonDepth2Img:
             image_weight (float): The weight of the input image.
             model (str): The Luma model to use for generation.
             seed (int): The seed for generation.
-            disable_depth (bool): If True, skips the MiDaS depth estimation step. This is
-                                  useful for debugging or when a depth map is not needed.
+            disable_depth (bool): If True, skips MiDaS depth estimation. This is
+                useful for debugging or when a depth map is not needed.
+            unique_id (str, optional): The unique ID of the node.
+            **kwargs: Additional keyword arguments for authentication.
+
+        Returns:
+            tuple[torch.Tensor | None, torch.Tensor]: A tuple containing the
+                generated image and the depth map image. The generated image can
+                be None if the API call is skipped.
         """
         depth_map_to_return = torch.zeros_like(image)
         if not disable_depth:
@@ -113,15 +151,22 @@ class LumaPhotonDepth2Img:
             with torch.no_grad():
                 prediction = midas(input_batch)
                 prediction = torch.nn.functional.interpolate(
-                    prediction.unsqueeze(1), size=img_np.shape[:2], mode="bicubic", align_corners=False
+                    prediction.unsqueeze(1),
+                    size=img_np.shape[:2],
+                    mode="bicubic",
+                    align_corners=False,
                 ).squeeze()
             
             depth_map_tensor = prediction.cpu()
             output_dir = os.path.join(folder_paths.get_output_directory(), "depth")
             os.makedirs(output_dir, exist_ok=True)
             
-            depth_map_normalized = (depth_map_tensor - depth_map_tensor.min()) / (depth_map_tensor.max() - depth_map_tensor.min())
-            depth_map_img = Image.fromarray((depth_map_normalized * 255).numpy().astype(np.uint8))
+            depth_map_normalized = (depth_map_tensor - depth_map_tensor.min()) / (
+                depth_map_tensor.max() - depth_map_tensor.min()
+            )
+            depth_map_img = Image.fromarray(
+                (depth_map_normalized * 255).numpy().astype(np.uint8)
+            )
             
             file_path = os.path.join(output_dir, f"depth_{uuid.uuid4()}.png")
             depth_map_img.save(file_path)
@@ -151,7 +196,8 @@ class LumaPhotonDepth2Img:
                 prompt=prompt,
                 model=model,
                 modify_image_ref=LumaModifyImageRef(
-                    url=image_url, weight=round(max(min(1.0-image_weight, 0.98), 0.0), 2)
+                    url=image_url,
+                    weight=round(max(min(1.0 - image_weight, 0.98), 0.0), 2),
                 ),
             ),
             auth_kwargs=auth_kwargs,
