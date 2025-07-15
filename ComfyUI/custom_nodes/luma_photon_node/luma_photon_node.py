@@ -36,6 +36,20 @@ def image_result_url_extractor(response: LumaGeneration):
     return response.assets.image if hasattr(response, "assets") and hasattr(response.assets, "image") else None
 
 class LumaPhotonDepth2Img:
+    _midas_model = None
+    _midas_transforms = None
+
+    @classmethod
+    def _get_midas_model(cls):
+        if cls._midas_model is None:
+            try:
+                cls._midas_model = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", trust_repo=True)
+                cls._midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", trust_repo=True)
+            except Exception:
+                cls._midas_model = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", source='github', trust_repo=True)
+                cls._midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", source='github', trust_repo=True)
+        return cls._midas_model, cls._midas_transforms
+
     @classmethod
     def INPUT_TYPES(s):
         """Defines the input types for the node."""
@@ -138,12 +152,7 @@ class LumaPhotonDepth2Img:
                 raise ValueError(f"Expected image tensor with shape [1, H, W, C], got {image.shape}")
             img_np = (image.squeeze().numpy() * 255).astype(np.uint8)
             
-            try:
-                midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", trust_repo=True)
-                midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", trust_repo=True)
-            except Exception:
-                midas = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", source='github', trust_repo=True)
-                midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", source='github', trust_repo=True)
+            midas, midas_transforms = self._get_midas_model()
 
             device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
             midas.to(device)
