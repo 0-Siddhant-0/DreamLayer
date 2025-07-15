@@ -42,11 +42,12 @@ class LumaPhotonDepth2Img:
             "required": {
                 "image": ("IMAGE",),
                 "prompt": ("STRING", {"multiline": True, "default": "A beautiful, photorealistic image"}),
-                "api_key": ("STRING", {"multiline": False}),
                 "disable_depth": ("BOOLEAN", {"default": False, "label_on": "depth disabled", "label_off": "depth enabled"}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
+                "auth_token": "AUTH_TOKEN_COMFY_ORG",
+                "comfy_api_key": "API_KEY_COMFY_ORG",
             },
         }
 
@@ -55,7 +56,7 @@ class LumaPhotonDepth2Img:
     FUNCTION = "generate_novel_view"
     CATEGORY = "DreamLayer/API"
 
-    def generate_novel_view(self, image: torch.Tensor, prompt: str, api_key: str, disable_depth: bool, unique_id: str = None, **kwargs):
+    def generate_novel_view(self, image: torch.Tensor, prompt: str, disable_depth: bool, unique_id: str = None, **kwargs):
         """
         This function generates a novel-view image using the Luma Photon API, with an
         optional local depth estimation step using MiDaS.
@@ -63,7 +64,6 @@ class LumaPhotonDepth2Img:
         Args:
             image (torch.Tensor): The input image tensor.
             prompt (str): Text prompt to guide the image generation.
-            api_key (str): Your Luma AI API key.
             disable_depth (bool): If True, skips the MiDaS depth estimation step. This is
                                   useful for debugging or when a depth map is not needed.
         """
@@ -104,12 +104,12 @@ class LumaPhotonDepth2Img:
             print(f"Saved depth map to {file_path}")
             depth_map_to_return = pil_to_tensor(depth_map_img.convert("RGB"))
 
-        if not api_key:
+        if not kwargs.get("comfy_api_key"):
             print("No API key provided. Skipping Luma API call and returning depth map.")
             return (image, depth_map_to_return)
 
         print("Calling Luma Photon API...")
-        auth_kwargs = {"auth_token": api_key}
+        auth_kwargs = kwargs
         
         download_urls = upload_images_to_comfyapi(
             image, max_images=1, auth_kwargs=auth_kwargs
