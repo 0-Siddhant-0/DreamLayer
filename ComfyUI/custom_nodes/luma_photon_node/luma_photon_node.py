@@ -186,8 +186,12 @@ class LumaPhotonDepth2Img:
             )
             
             file_path = os.path.join(output_dir, f"depth_{uuid.uuid4()}.png")
-            depth_map_img.save(file_path)
-            print(f"Saved depth map to {file_path}")
+            try:
+                depth_map_img.save(file_path)
+                print(f"Saved depth map to {file_path}")
+            except (OSError, IOError) as e:
+                print(f"Warning: Failed to save depth map to {file_path}: {e}")
+                # Continue execution even if saving fails
             depth_map_to_return = pil_to_tensor(depth_map_img.convert("RGB"))
 
         if not kwargs.get("comfy_api_key"):
