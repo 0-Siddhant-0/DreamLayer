@@ -34,7 +34,8 @@ class LumaPhotonDepth2Img:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "IMAGE")
+    RETURN_NAMES = ("image", "depth_map_image")
     FUNCTION = "generate_novel_view"
     CATEGORY = "DreamLayer/API"
 
@@ -52,6 +53,7 @@ class LumaPhotonDepth2Img:
             seed (int): The seed for the generation.
             guidance_scale (float): The guidance scale for the generation.
         """
+        depth_map_to_return = torch.zeros_like(image)
         if not disable_depth:
             print("Running MiDaS depth estimation...")
             img_np = (image.squeeze().numpy() * 255).astype(np.uint8)
@@ -86,6 +88,11 @@ class LumaPhotonDepth2Img:
             file_path = os.path.join(output_dir, f"depth_{uuid.uuid4()}.png")
             depth_map_img.save(file_path)
             print(f"Saved depth map to {file_path}")
+            depth_map_to_return = pil_to_tensor(depth_map_img.convert("RGB"))
+
+        if not api_key:
+            print("No API key provided. Skipping Luma API call and returning depth map.")
+            return (image, depth_map_to_return)
 
         print("Calling Luma Photon API...")
         client = AsyncLumaAI(api_key=api_key)
@@ -122,7 +129,7 @@ class LumaPhotonDepth2Img:
                     image_data = await resp.read()
             
             result_image = Image.open(io.BytesIO(image_data)).convert("RGB")
-            return (pil_to_tensor(result_image),)
+            return (pil_to_tensor(result_image), depth_map_to_return)
         finally:
             if temp_filepath and os.path.exists(temp_filepath):
                 os.remove(temp_filepath)
