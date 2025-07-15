@@ -12,7 +12,7 @@ from comfy_api_nodes.apis.luma_api import (
     LumaImageModel,
     LumaImageGenerationRequest,
     LumaGeneration,
-    LumaImageRef,
+    LumaModifyImageRef,
     LumaState,
 )
 from comfy_api_nodes.apis.client import (
@@ -42,6 +42,27 @@ class LumaPhotonDepth2Img:
             "required": {
                 "image": ("IMAGE",),
                 "prompt": ("STRING", {"multiline": True, "default": "A beautiful, photorealistic image"}),
+                "image_weight": (
+                    "FLOAT",
+                    {
+                        "default": 0.1,
+                        "min": 0.0,
+                        "max": 0.98,
+                        "step": 0.01,
+                        "tooltip": "Weight of the image; the closer to 1.0, the less the image will be modified.",
+                    },
+                ),
+                "model": ([model.value for model in LumaImageModel],),
+                "seed": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 0xFFFFFFFFFFFFFFFF,
+                        "control_after_generate": True,
+                        "tooltip": "Seed to determine if node should re-run; actual results are nondeterministic regardless of seed.",
+                    },
+                ),
                 "disable_depth": ("BOOLEAN", {"default": False, "label_on": "depth disabled", "label_off": "depth enabled"}),
             },
             "hidden": {
@@ -56,7 +77,7 @@ class LumaPhotonDepth2Img:
     FUNCTION = "generate_novel_view"
     CATEGORY = "DreamLayer/API"
 
-    def generate_novel_view(self, image: torch.Tensor, prompt: str, disable_depth: bool, unique_id: str = None, **kwargs):
+    def generate_novel_view(self, image: torch.Tensor, prompt: str, image_weight: float, model: str, seed: int, disable_depth: bool, unique_id: str = None, **kwargs):
         """
         This function generates a novel-view image using the Luma Photon API, with an
         optional local depth estimation step using MiDaS.
@@ -64,6 +85,9 @@ class LumaPhotonDepth2Img:
         Args:
             image (torch.Tensor): The input image tensor.
             prompt (str): Text prompt to guide the image generation.
+            image_weight (float): The weight of the input image.
+            model (str): The Luma model to use for generation.
+            seed (int): The seed for generation.
             disable_depth (bool): If True, skips the MiDaS depth estimation step. This is
                                   useful for debugging or when a depth map is not needed.
         """
@@ -116,8 +140,6 @@ class LumaPhotonDepth2Img:
         )
         image_url = download_urls[0]
 
-        image_ref = [LumaImageRef(url=image_url, weight=1.0)]
-
         operation = SynchronousOperation(
             endpoint=ApiEndpoint(
                 path="/proxy/luma/generations/image",
@@ -127,8 +149,10 @@ class LumaPhotonDepth2Img:
             ),
             request=LumaImageGenerationRequest(
                 prompt=prompt,
-                model=LumaImageModel.photon_1,
-                image_ref=image_ref,
+                model=model,
+                modify_image_ref=LumaModifyImageRef(
+                    url=image_url, weight=round(max(min(1.0-image_weight, 0.98), 0.0), 2)
+                ),
             ),
             auth_kwargs=auth_kwargs,
         )
