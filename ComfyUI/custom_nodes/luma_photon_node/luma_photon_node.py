@@ -204,6 +204,9 @@ class LumaPhotonDepth2Img:
         download_urls = upload_images_to_comfyapi(
             image, max_images=1, auth_kwargs=auth_kwargs
         )
+        if not download_urls:
+            logger.error("Failed to upload image to ComfyAPI")
+            return (None, depth_map_to_return)
         image_url = download_urls[0]
 
         operation = SynchronousOperation(
@@ -218,7 +221,7 @@ class LumaPhotonDepth2Img:
                 model=model,
                 modify_image_ref=LumaModifyImageRef(
                     url=image_url,
-                    weight=round(max(min(1.0 - image_weight, 0.98), 0.0), 2),
+                    weight=round(max(min(image_weight, 0.98), 0.0), 2),
                 ),
             ),
             auth_kwargs=auth_kwargs,
@@ -247,4 +250,5 @@ class LumaPhotonDepth2Img:
             img = process_image_response(img_response)
             return (img, depth_map_to_return)
         except requests.RequestException as e:
+            logger.error(f"Failed to download generated image: {e}")
             return (None, depth_map_to_return)
