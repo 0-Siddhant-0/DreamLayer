@@ -1,23 +1,38 @@
+from __future__ import annotations
 import torch
 import numpy as np
 from PIL import Image
 import os
 import io
-import asyncio
-import aiohttp
 import uuid
+import requests
 
 import folder_paths
-from lumaai import AsyncLumaAI
-
-# Helper to convert a tensor to a PIL Image
-def tensor_to_pil(tensor):
-    image_np = tensor.squeeze().mul(255).clamp(0, 255).byte().numpy()
-    return Image.fromarray(image_np, 'RGB')
+from comfy_api_nodes.apis.luma_api import (
+    LumaImageModel,
+    LumaImageGenerationRequest,
+    LumaGeneration,
+    LumaImageRef,
+    LumaState,
+)
+from comfy_api_nodes.apis.client import (
+    ApiEndpoint,
+    HttpMethod,
+    SynchronousOperation,
+    PollingOperation,
+    EmptyRequest,
+)
+from comfy_api_nodes.apinode_utils import (
+    upload_images_to_comfyapi,
+    process_image_response,
+)
 
 # Helper to convert a PIL Image to a tensor
 def pil_to_tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+
+def image_result_url_extractor(response: LumaGeneration):
+    return response.assets.image if hasattr(response, "assets") and hasattr(response.assets, "image") else None
 
 class LumaPhotonDepth2Img:
     @classmethod
@@ -29,9 +44,10 @@ class LumaPhotonDepth2Img:
                 "prompt": ("STRING", {"multiline": True, "default": "A beautiful, photorealistic image"}),
                 "api_key": ("STRING", {"multiline": False}),
                 "disable_depth": ("BOOLEAN", {"default": False, "label_on": "depth disabled", "label_off": "depth enabled"}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "guidance_scale": ("FLOAT", {"default": 7.5, "min": 1.0, "max": 20.0, "step": 0.1}),
-            }
+            },
+            "hidden": {
+                "unique_id": "UNIQUE_ID",
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE")
@@ -39,7 +55,7 @@ class LumaPhotonDepth2Img:
     FUNCTION = "generate_novel_view"
     CATEGORY = "DreamLayer/API"
 
-    async def _generate_novel_view_async(self, image, prompt, api_key, disable_depth, seed, guidance_scale):
+    def generate_novel_view(self, image: torch.Tensor, prompt: str, api_key: str, disable_depth: bool, unique_id: str = None, **kwargs):
         """
         This function generates a novel-view image using the Luma Photon API, with an
         optional local depth estimation step using MiDaS.
@@ -50,8 +66,6 @@ class LumaPhotonDepth2Img:
             api_key (str): Your Luma AI API key.
             disable_depth (bool): If True, skips the MiDaS depth estimation step. This is
                                   useful for debugging or when a depth map is not needed.
-            seed (int): The seed for the generation.
-            guidance_scale (float): The guidance scale for the generation.
         """
         depth_map_to_return = torch.zeros_like(image)
         if not disable_depth:
@@ -95,45 +109,47 @@ class LumaPhotonDepth2Img:
             return (image, depth_map_to_return)
 
         print("Calling Luma Photon API...")
-        client = AsyncLumaAI(api_key=api_key)
-        temp_filepath = None
-        try:
-            temp_dir = folder_paths.get_temp_directory()
-            os.makedirs(temp_dir, exist_ok=True)
-            temp_filename = f"luma_input_{uuid.uuid4()}.png"
-            temp_filepath = os.path.join(temp_dir, temp_filename)
-            tensor_to_pil(image).save(temp_filepath)
+        auth_kwargs = {"auth_token": api_key}
+        
+        download_urls = upload_images_to_comfyapi(
+            image, max_images=1, auth_kwargs=auth_kwargs
+        )
+        image_url = download_urls[0]
 
-            print(f"Uploading image: {temp_filepath}")
-            upload_result = await client.uploads.create(file_path=temp_filepath)
-            
-            print("Creating generation...")
-            generation = await client.generations.image.create(
-                prompt=prompt, image_ref=[{"url": image_url}]
-            )
+        image_ref = [LumaImageRef(url=image_url, weight=1.0)]
 
-            print(f"Polling generation ID: {generation.id}")
-            while generation.state not in ["completed", "failed"]:
-                await asyncio.sleep(5)
-                generation = await client.generations.get(id=generation.id)
-                print(f"Generation state: {generation.state}")
+        operation = SynchronousOperation(
+            endpoint=ApiEndpoint(
+                path="/proxy/luma/generations/image",
+                method=HttpMethod.POST,
+                request_model=LumaImageGenerationRequest,
+                response_model=LumaGeneration,
+            ),
+            request=LumaImageGenerationRequest(
+                prompt=prompt,
+                model=LumaImageModel.photon_1,
+                image_ref=image_ref,
+            ),
+            auth_kwargs=auth_kwargs,
+        )
+        response_api: LumaGeneration = operation.execute()
 
-            if generation.state == "failed":
-                raise Exception(f"Luma API generation failed: {generation.failure_reason}")
+        operation = PollingOperation(
+            poll_endpoint=ApiEndpoint(
+                path=f"/proxy/luma/generations/{response_api.id}",
+                method=HttpMethod.GET,
+                request_model=EmptyRequest,
+                response_model=LumaGeneration,
+            ),
+            completed_statuses=[LumaState.completed],
+            failed_statuses=[LumaState.failed],
+            status_extractor=lambda x: x.state,
+            result_url_extractor=image_result_url_extractor,
+            node_id=unique_id,
+            auth_kwargs=auth_kwargs,
+        )
+        response_poll = operation.execute()
 
-            result_image_url = generation.assets.image
-            print(f"Downloading result from {result_image_url}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(result_image_url) as resp:
-                    resp.raise_for_status()
-                    image_data = await resp.read()
-            
-            result_image = Image.open(io.BytesIO(image_data)).convert("RGB")
-            return (pil_to_tensor(result_image), depth_map_to_return)
-        finally:
-            if temp_filepath and os.path.exists(temp_filepath):
-                os.remove(temp_filepath)
-            await client.close()
-
-    def generate_novel_view(self, image, prompt, api_key, disable_depth, seed, guidance_scale):
-        return asyncio.run(self._generate_novel_view_async(image, prompt, api_key, disable_depth, seed, guidance_scale))
+        img_response = requests.get(response_poll.assets.image)
+        img = process_image_response(img_response)
+        return (img, depth_map_to_return)
