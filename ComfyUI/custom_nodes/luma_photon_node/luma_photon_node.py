@@ -3,8 +3,6 @@ import torch
 import numpy as np
 from PIL import Image
 import os
-import os
-import uuid
 import uuid
 import requests
 
@@ -234,5 +232,13 @@ class LumaPhotonDepth2Img:
             img = process_image_response(img_response)
             return (img, depth_map_to_return)
         except requests.RequestException as e:
-            logger.error(f"Failed to download generated image: {e}")
+# At the top of ComfyUI/custom_nodes/luma_photon_node/luma_photon_node.py
+import logging
+logger = logging.getLogger(__name__)
+
+import os
+import uuid
+import torch
+import requests
+# … rest of existing imports and code
             return (None, depth_map_to_return)
