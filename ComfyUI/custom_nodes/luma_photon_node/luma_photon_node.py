@@ -221,7 +221,7 @@ class LumaPhotonDepth2Img:
                 model=model,
                 modify_image_ref=LumaModifyImageRef(
                     url=image_url,
-                    weight=round(max(min(image_weight, 0.98), 0.0), 2),
+                    weight=round(max(min(1.0 - image_weight, 0.98), 0.0), 2),
                 ),
             ),
             auth_kwargs=auth_kwargs,
