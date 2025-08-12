@@ -1,0 +1,55 @@
+{
+  "prompt": {
+    "1": {
+      "class_type": "LumaPhotonDepth2Img",
+      "inputs": {
+        "image": null,
+        "prompt": "beautiful 3D object",
+        "aspect_ratio": "3:4",
+        "model": "photon-1",
+        "image_weight": 0.1,
+        "seed": 0,
+        "disable_depth": false
+      }
+    },
+    "2": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["1", 0],
+        "filename_prefix": "DreamLayer_Luma_3D"
+      }
+    },
+    "3": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["1", 1],
+        "filename_prefix": "DreamLayer_Luma_3D_depth"
+      }
+    }
+  },
+  "meta": {
+    "description": "Luma Photon 3D Generation Workflow with Depth Maps",
+    "model_options": {
+      "luma": "LumaPhotonDepth2Img"
+    },
+    "core_settings": {
+      "prompt": "Main generation prompt for 3D object",
+      "aspect_ratio": "Image aspect ratio",
+      "model": "Luma model to use (photon-1, photon-flash-1)",
+      "image_weight": "Weight of the input image (0.0-0.98)",
+      "seed": "Random seed (0 for random)",
+      "disable_depth": "Skip depth map generation for faster execution"
+    },
+    "aspect_ratios": [
+      "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"
+    ],
+    "models": [
+      "photon-1", "photon-flash-1"
+    ],
+    "special_features": [
+      "3D-aware generation",
+      "Depth map output",
+      "Novel view synthesis"
+    ]
+  }
+}

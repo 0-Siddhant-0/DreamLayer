@@ -34,6 +34,7 @@ NODE_TO_API_KEY_MAPPING = {
     "IdeogramV1": "IDEOGRAM_API_KEY",
     "IdeogramV2": "IDEOGRAM_API_KEY",
     "IdeogramV3": "IDEOGRAM_API_KEY",
+    
     # Stability AI Nodes - Use direct API key
     "StabilityStableImageUltraNode": "STABILITY_API_KEY",
     "StabilityStableImageSD_3_5Node": "STABILITY_API_KEY",
@@ -44,6 +45,15 @@ NODE_TO_API_KEY_MAPPING = {
     # Gemini Nodes
     "GeminiNode": "GEMINI_API_KEY",
     "GeminiInputFiles": "GEMINI_API_KEY",
+    
+    # Luma Photon Nodes (use direct API)
+    "LumaPhotonDepth2Img": "LUMA_API_KEY",
+    
+    # Existing ComfyUI Luma Nodes (use ComfyUI proxy)
+    "LumaImageGenerationNode": "LUMA_API_KEY",
+    "LumaImageModifyNode": "LUMA_API_KEY",
+    "LumaTextToVideoGenerationNode": "LUMA_API_KEY",
+    "LumaImageToVideoGenerationNode": "LUMA_API_KEY",
 }
 
 # Mapping of environment variable names to ComfyUI extra_data keys
@@ -55,6 +65,7 @@ ENV_KEY_TO_EXTRA_DATA_MAPPING = {
     "COMFY_API_KEY": "api_key_comfy_org",
     "COMFY_AUTH_TOKEN": "auth_token_comfy_org",
     "GEMINI_API_KEY": "api_key_comfy_org",
+    "LUMA_API_KEY": "luma_api_key",  # Direct API key for Luma
     # Future additions:
     # "ANTHROPIC_API_KEY": "api_key_anthropic",
 }

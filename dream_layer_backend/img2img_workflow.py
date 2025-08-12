@@ -256,7 +256,11 @@ def get_img2img_workflow_template(model_name, use_controlnet=False, use_lora=Fal
     # Check for Stability AI models
     elif "stability" in model_name_lower:
         return "workflows/img2img/stability_core_generation_workflow.json"
-
+    
+    # Check for Luma models
+    elif "photon" in model_name_lower:
+        return "workflows/img2img/luma_core_generation_workflow.json"
+    
     # For all other models (SD1.5, SDXL, etc.), use the appropriate workflow based on features
     else:
         if use_controlnet and use_lora:

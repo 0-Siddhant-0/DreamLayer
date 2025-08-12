@@ -61,13 +61,11 @@ def transform_to_txt2img_workflow(data):
             seed = random.randint(0, 2**32 - 1)
 
         # Handle model name validation
-        model_name = data.get(
-            'model_name', 'juggernautXL_v8Rundiffusion.safetensors')
-
-        # Check if it's a closed-source model (DALL-E, FLUX, Ideogram, Stability AI, etc.)
-        closed_source_models = ['dall-e-3', 'dall-e-2', 'flux-pro',
-                                'flux-dev', 'ideogram-v3', 'stability-sdxl', 'stability-sd-turbo']
-
+        model_name = data.get('model_name', 'juggernautXL_v8Rundiffusion.safetensors')
+        
+        # Check if it's a closed-source model (DALL-E, FLUX, Ideogram, Stability AI, Luma, etc.)
+        closed_source_models = ['dall-e-3', 'dall-e-2', 'flux-pro', 'flux-dev', 'ideogram-v3', 'stability-sdxl', 'stability-sd-turbo', 'photon-1', 'photon-flash-1']
+        
         if model_name in closed_source_models:
             print(f"🎨 Using closed-source model: {model_name}")
 

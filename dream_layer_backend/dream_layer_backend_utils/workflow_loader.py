@@ -30,6 +30,8 @@ def _determine_workflow_path(workflow_request: Dict[str, Any]) -> str:
         filename = "ideogram_core_generation_workflow.json"
     elif 'stability' in model_name:
         filename = "stability_core_generation_workflow.json"
+    elif 'photon' in model_name:  # Luma Photon models
+        filename = "luma_core_generation_workflow.json"
     elif controlnet and lora:
         filename = "local_controlnet_lora.json"
     elif controlnet:
