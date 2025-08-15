@@ -211,8 +211,7 @@ class LumaImageGenerationNode(ComfyNodeABC):
                 ),
             },
             "hidden": {
-                "auth_token": "AUTH_TOKEN_COMFY_ORG",
-                "comfy_api_key": "API_KEY_COMFY_ORG",
+                "luma_api_key": "LUMA_API_KEY",
                 "unique_id": "UNIQUE_ID",
             },
         }
@@ -230,67 +229,72 @@ class LumaImageGenerationNode(ComfyNodeABC):
         unique_id: str = None,
         **kwargs,
     ):
+        print(f"[DEBUG] kwargs received: {list(kwargs.keys())}")
+        print(f"[DEBUG] luma_api_key present: {'luma_api_key' in kwargs}")
+        if 'luma_api_key' in kwargs:
+            print(f"[DEBUG] luma_api_key value: {kwargs['luma_api_key'][:10]}...")
+        else:
+            print("[DEBUG] No luma_api_key found in kwargs")
+        
         validate_string(prompt, strip_whitespace=True, min_length=3)
-        # handle image_luma_ref
-        api_image_ref = None
-        if image_luma_ref is not None:
-            api_image_ref = self._convert_luma_refs(
-                image_luma_ref, max_refs=4, auth_kwargs=kwargs,
+        
+        # Get API key from kwargs
+        luma_api_key = kwargs.get("luma_api_key")
+        if not luma_api_key:
+            raise Exception("Luma API key not found. Please add your LUMA_API_KEY to the .env file.")
+        
+        # Prepare headers for direct API call
+        headers = {
+            "accept": "application/json",
+            "authorization": f"Bearer {luma_api_key}",
+            "content-type": "application/json"
+        }
+        
+        # Prepare payload for Luma API
+        payload = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "model": model
+        }
+        
+        # Make direct API call to Luma
+        try:
+            response = requests.post(
+                "https://api.lumalabs.ai/dream-machine/v1/generations/image",
+                headers=headers,
+                json=payload
             )
-        # handle style_luma_ref
-        api_style_ref = None
-        if style_image is not None:
-            api_style_ref = self._convert_style_image(
-                style_image, weight=style_image_weight, auth_kwargs=kwargs,
-            )
-        # handle character_ref images
-        character_ref = None
-        if character_image is not None:
-            download_urls = upload_images_to_comfyapi(
-                character_image, max_images=4, auth_kwargs=kwargs,
-            )
-            character_ref = LumaCharacterRef(
-                identity0=LumaImageIdentity(images=download_urls)
-            )
-
-        operation = SynchronousOperation(
-            endpoint=ApiEndpoint(
-                path="/proxy/luma/generations/image",
-                method=HttpMethod.POST,
-                request_model=LumaImageGenerationRequest,
-                response_model=LumaGeneration,
-            ),
-            request=LumaImageGenerationRequest(
-                prompt=prompt,
-                model=model,
-                aspect_ratio=aspect_ratio,
-                image_ref=api_image_ref,
-                style_ref=api_style_ref,
-                character_ref=character_ref,
-            ),
-            auth_kwargs=kwargs,
-        )
-        response_api: LumaGeneration = operation.execute()
-
-        operation = PollingOperation(
-            poll_endpoint=ApiEndpoint(
-                path=f"/proxy/luma/generations/{response_api.id}",
-                method=HttpMethod.GET,
-                request_model=EmptyRequest,
-                response_model=LumaGeneration,
-            ),
-            completed_statuses=[LumaState.completed],
-            failed_statuses=[LumaState.failed],
-            status_extractor=lambda x: x.state,
-            result_url_extractor=image_result_url_extractor,
-            node_id=unique_id,
-            auth_kwargs=kwargs,
-        )
-        response_poll = operation.execute()
-
-        img_response = requests.get(response_poll.assets.image)
-        img = process_image_response(img_response)
-        return (img,)
+            response.raise_for_status()
+            
+            # Parse response and poll until complete
+            result = response.json()
+            generation_id = result["id"]
+            
+            # Poll until generation is complete
+            while result["state"] != "completed":
+                import time
+                time.sleep(2)
+                status_response = requests.get(
+                    f"https://api.lumalabs.ai/dream-machine/v1/generations/{generation_id}",
+                    headers=headers
+                )
+                status_response.raise_for_status()
+                result = status_response.json()
+            
+            # Now download the image
+            if "assets" in result and "image" in result["assets"]:
+                image_url = result["assets"]["image"]
+                img_response = requests.get(image_url, headers={"authorization": f"Bearer {luma_api_key}"})
+                img_response.raise_for_status()
+                img = process_image_response(img_response)
+                return (img,)
+            else:
+                raise Exception(f"Unexpected response format: {result}")
+                
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Luma API request failed: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error processing Luma API response: {str(e)}")
 
     def _convert_luma_refs(
         self, luma_ref: LumaReferenceChain, max_refs: int, auth_kwargs: Optional[dict[str,str]] = None
@@ -364,8 +368,7 @@ class LumaImageModifyNode(ComfyNodeABC):
             },
             "optional": {},
             "hidden": {
-                "auth_token": "AUTH_TOKEN_COMFY_ORG",
-                "comfy_api_key": "API_KEY_COMFY_ORG",
+                "luma_api_key": "LUMA_API_KEY",
                 "unique_id": "UNIQUE_ID",
             },
         }
@@ -380,49 +383,88 @@ class LumaImageModifyNode(ComfyNodeABC):
         unique_id: str = None,
         **kwargs,
     ):
-        # first, upload image
-        download_urls = upload_images_to_comfyapi(
-            image, max_images=1, auth_kwargs=kwargs,
-        )
-        image_url = download_urls[0]
-        # next, make Luma call with download url provided
-        operation = SynchronousOperation(
-            endpoint=ApiEndpoint(
-                path="/proxy/luma/generations/image",
-                method=HttpMethod.POST,
-                request_model=LumaImageGenerationRequest,
-                response_model=LumaGeneration,
-            ),
-            request=LumaImageGenerationRequest(
-                prompt=prompt,
-                model=model,
-                modify_image_ref=LumaModifyImageRef(
-                    url=image_url, weight=round(max(min(1.0-image_weight, 0.98), 0.0), 2)
-                ),
-            ),
-            auth_kwargs=kwargs,
-        )
-        response_api: LumaGeneration = operation.execute()
-
-        operation = PollingOperation(
-            poll_endpoint=ApiEndpoint(
-                path=f"/proxy/luma/generations/{response_api.id}",
-                method=HttpMethod.GET,
-                request_model=EmptyRequest,
-                response_model=LumaGeneration,
-            ),
-            completed_statuses=[LumaState.completed],
-            failed_statuses=[LumaState.failed],
-            status_extractor=lambda x: x.state,
-            result_url_extractor=image_result_url_extractor,
-            node_id=unique_id,
-            auth_kwargs=kwargs,
-        )
-        response_poll = operation.execute()
-
-        img_response = requests.get(response_poll.assets.image)
-        img = process_image_response(img_response)
-        return (img,)
+        # Get API key from kwargs
+        luma_api_key = kwargs.get("luma_api_key")
+        if not luma_api_key:
+            raise Exception("Luma API key not found. Please add your LUMA_API_KEY to the .env file.")
+        
+        # Convert image to base64 for direct API call
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        import numpy as np
+        
+        # Convert torch tensor to PIL Image
+        if image.dim() == 4:
+            image = image[0]  # Take first image if batch
+        image_np = image.cpu().numpy()
+        if image_np.shape[0] == 3:  # CHW format
+            image_np = np.transpose(image_np, (1, 2, 0))  # Convert to HWC
+        image_np = (image_np * 255).astype(np.uint8)
+        pil_image = Image.fromarray(image_np)
+        
+        # Convert to base64
+        buffer = BytesIO()
+        pil_image.save(buffer, format="PNG")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Prepare headers for direct API call
+        headers = {
+            "accept": "application/json",
+            "authorization": f"Bearer {luma_api_key}",
+            "content-type": "application/json"
+        }
+        
+        # Prepare payload for Luma API (image-to-image)
+        payload = {
+            "prompt": prompt,
+            "model": model,
+            "image": image_base64,
+            "image_weight": round(max(min(1.0-image_weight, 0.98), 0.0), 2)
+        }
+        
+        # Make direct API call to Luma
+        try:
+            response = requests.post(
+                "https://api.lumalabs.ai/dream-machine/v1/generations/image",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            
+            # Parse response and poll until complete
+            result = response.json()
+            print(f"[DEBUG] Initial Luma response: {result}")
+            generation_id = result["id"]
+            
+            # Poll until generation is complete
+            while result["state"] != "completed":
+                import time
+                time.sleep(2)
+                status_response = requests.get(
+                    f"https://api.lumalabs.ai/dream-machine/v1/generations/{generation_id}",
+                    headers=headers
+                )
+                status_response.raise_for_status()
+                result = status_response.json()
+                print(f"[DEBUG] Polling response: {result}")
+            
+            # Now download the image
+            if "assets" in result and "image" in result["assets"]:
+                image_url = result["assets"]["image"]
+                print(f"[DEBUG] Image URL: {image_url}")
+                img_response = requests.get(image_url, headers={"authorization": f"Bearer {luma_api_key}"})
+                img_response.raise_for_status()
+                print(f"[DEBUG] Image download status: {img_response.status_code}, content length: {len(img_response.content) if img_response.content else 'None'}")
+                img = process_image_response(img_response)
+                return (img,)
+            else:
+                raise Exception(f"Unexpected response format: {result}")
+                
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Luma API request failed: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error processing Luma API response: {str(e)}")
 
 
 class LumaTextToVideoGenerationNode(ComfyNodeABC):

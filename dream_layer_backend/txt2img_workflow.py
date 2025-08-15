@@ -3,7 +3,7 @@ import random
 import os
 import json
 from dream_layer_backend_utils.workflow_loader import load_workflow
-from dream_layer_backend_utils.api_key_injector import inject_api_keys_into_workflow
+from dream_layer_backend_utils.api_key_injector import inject_api_keys_into_workflow, read_api_keys_from_env
 from dream_layer_backend_utils.update_custom_workflow import override_workflow
 from dream_layer_backend_utils.update_custom_workflow import update_custom_workflow, validate_custom_workflow
 from dream_layer_backend_utils.shared_workflow_parameters import (
@@ -151,6 +151,8 @@ def transform_to_txt2img_workflow(data):
             workflow_model_type = 'ideogram'
         elif 'stability' in model_name.lower():  # Added check for Stability AI models
             workflow_model_type = 'stability'
+        elif 'photon' in model_name.lower():  # Added check for Luma models
+            workflow_model_type = 'photon'
         else:
             workflow_model_type = 'local'
 
@@ -168,7 +170,8 @@ def transform_to_txt2img_workflow(data):
         print(f"✅ Workflow loaded successfully")
 
         # Inject API keys if needed (for DALL-E, FLUX, etc.)
-        workflow = inject_api_keys_into_workflow(workflow)
+        all_api_keys = read_api_keys_from_env()
+        workflow = inject_api_keys_into_workflow(workflow, all_api_keys)
         print(f"✅ API keys injected")
 
         # Custom workflow support from smallFeatures

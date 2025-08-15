@@ -49,6 +49,9 @@ NODE_TO_API_KEY_MAPPING = {
     # Luma Photon Nodes (use direct API)
     "LumaPhotonDepth2Img": "LUMA_API_KEY",
     
+    # Luma Image Node (direct API)
+    "LumaImageNode": "LUMA_API_KEY",
+    
     # Existing ComfyUI Luma Nodes (use ComfyUI proxy)
     "LumaImageGenerationNode": "LUMA_API_KEY",
     "LumaImageModifyNode": "LUMA_API_KEY",
@@ -107,18 +110,20 @@ def read_api_keys_from_env() -> Dict[str, str]:
     return api_keys
 
 
-def inject_api_keys_into_workflow(workflow: Dict[str, Any]) -> Dict[str, Any]:
+def inject_api_keys_into_workflow(workflow: Dict[str, Any], all_api_keys: Dict[str, str] = None) -> Dict[str, Any]:
     """
     Inject API keys from environment variables into workflow extra_data based on nodes present.
 
     Args:
         workflow: The workflow dictionary to inject keys into
+        all_api_keys: Optional dictionary of API keys. If None, reads from environment.
 
     Returns:
         Workflow with appropriate API keys added to extra_data
     """
-    # Read all available API keys from environment
-    all_api_keys = read_api_keys_from_env()
+    # Use passed API keys or read from environment if not provided
+    if all_api_keys is None:
+        all_api_keys = read_api_keys_from_env()
 
     # Create a copy to avoid modifying the original
     workflow_with_keys = workflow.copy()
@@ -186,6 +191,27 @@ def inject_api_keys_into_workflow(workflow: Dict[str, Any]) -> Dict[str, Any]:
 
     if not has_stability_nodes:
         print("[DEBUG] No Stability AI nodes found in workflow")
+
+    # Special handling for Luma nodes - inject luma_api_key as hidden input
+    has_luma_nodes = False
+    for node_id, node_data in workflow.get("prompt", {}).items():
+        class_type = node_data.get("class_type", "")
+        if class_type.startswith("Luma"):
+            has_luma_nodes = True
+            # For Luma nodes, inject the luma API key as hidden input
+            if "LUMA_API_KEY" in all_api_keys:
+                luma_key = all_api_keys["LUMA_API_KEY"]
+                # Ensure inputs section exists
+                if "inputs" not in workflow_with_keys["prompt"][node_id]:
+                    workflow_with_keys["prompt"][node_id]["inputs"] = {}
+                # Add luma_api_key as hidden input
+                workflow_with_keys["prompt"][node_id]["inputs"]["luma_api_key"] = luma_key
+                print(f"[DEBUG] Injected luma_api_key as hidden input for {class_type}")
+            else:
+                print(f"[DEBUG] LUMA_API_KEY not found for {class_type}")
+
+    if not has_luma_nodes:
+        print("[DEBUG] No Luma nodes found in workflow")
 
     print(f"[DEBUG] Final extra_data: {workflow_with_keys['extra_data']}")
 
