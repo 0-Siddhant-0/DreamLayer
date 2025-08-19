@@ -215,6 +215,12 @@ main() {
     # Start img2txt_server.py
     start_python_server "img2txt_server" "img2txt_server.py" 5007
     
+    # Start localtunnel for external API access
+    if command -v lt >/dev/null 2>&1; then
+        lt --port 5002 > "logs/tunnel.log" 2>&1 &
+        echo $! > "logs/tunnel.pid"
+    fi
+    
     # Start frontend
     print_status "Starting frontend development server..."
     cd dream_layer_frontend
