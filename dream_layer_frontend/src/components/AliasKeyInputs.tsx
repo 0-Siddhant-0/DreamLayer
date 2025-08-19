@@ -33,6 +33,12 @@ const fields = [
     placeholder: "Enter Gemini API Key",
     docs: "https://ai.google.dev/gemini-api/docs/api-key",
   },
+  {
+    name: "Luma AI",
+    alias: "LUMA_API_KEY",
+    placeholder: "Enter Luma API Key",
+    docs: "https://lumalabs.ai/dream-machine/api",
+  },
 ];
 
 const ApiKeysForm: React.FC = () => {
