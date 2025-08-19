@@ -1,7 +1,7 @@
 {
   "prompt": {
     "1": {
-      "class_type": "LumaImageGenerationNode",
+      "class_type": "LumaImageNode",
       "inputs": {
         "prompt": "beautiful",
         "aspect_ratio": "3:4",
@@ -21,7 +21,7 @@
   "meta": {
     "description": "Luma Photon Core Generation Workflow",
     "model_options": {
-      "luma": "LumaImageGenerationNode"
+      "luma": "LumaImageNode"
     },
     "core_settings": {
       "prompt": "Main generation prompt",
