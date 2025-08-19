@@ -454,7 +454,7 @@ class LumaImageModifyNode(ComfyNodeABC):
             "model": model,
             "modify_image_ref": {
                 "url": image_url,
-                "weight": 0.8  # Hardcoded higher weight for testing
+                "weight": 0.8  # Higher weight for more dramatic modifications
             }
         }
         
