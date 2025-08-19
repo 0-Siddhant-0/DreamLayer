@@ -388,9 +388,9 @@ class LumaImageModifyNode(ComfyNodeABC):
         if not luma_api_key:
             raise Exception("Luma API key not found. Please add your LUMA_API_KEY to the .env file.")
         
-        # Convert image to base64 for direct API call
-        import base64
-        from io import BytesIO
+        # Save image tensor to file and create URL for Luma API
+        import os
+        import uuid
         from PIL import Image
         import numpy as np
         
@@ -403,10 +403,43 @@ class LumaImageModifyNode(ComfyNodeABC):
         image_np = (image_np * 255).astype(np.uint8)
         pil_image = Image.fromarray(image_np)
         
-        # Convert to base64
-        buffer = BytesIO()
-        pil_image.save(buffer, format="PNG")
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        # Save to ComfyUI input directory with unique filename
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(current_dir)
+        input_dir = os.path.join(parent_dir, "input")
+        
+        # Create unique filename
+        image_filename = f"luma_temp_{unique_id or uuid.uuid4().hex[:8]}.png"
+        image_filepath = os.path.join(input_dir, image_filename)
+        
+        # Save image
+        pil_image.save(image_filepath, "PNG")
+        
+        # Get localtunnel URL dynamically or fallback to localhost
+        def get_tunnel_url():
+            try:
+                # Check if localtunnel log file exists and read the URL
+                # Navigate from ComfyUI/comfy_api_nodes to DreamLayer/logs
+                current_dir = os.path.dirname(os.path.abspath(__file__))  # comfy_api_nodes
+                parent_dir = os.path.dirname(current_dir)  # ComfyUI
+                dreamlayer_root = os.path.dirname(parent_dir)  # DreamLayer
+                tunnel_log_path = os.path.join(dreamlayer_root, "logs", "tunnel.log")
+                
+                if os.path.exists(tunnel_log_path):
+                    with open(tunnel_log_path, "r") as f:
+                        content = f.read()
+                        # Look for localtunnel URL pattern
+                        import re
+                        match = re.search(r'https://[a-z0-9-]+\.loca\.lt', content)
+                        if match:
+                            return match.group(0)
+            except:
+                pass  # Ignore any errors and fallback
+            return "http://localhost:5002"  # Fallback to localhost
+        
+        base_url = get_tunnel_url()
+        image_url = f"{base_url}/api/images/{image_filename}"
+        print(f"[DEBUG] Using image URL: {image_url}")
         
         # Prepare headers for direct API call
         headers = {
@@ -415,12 +448,14 @@ class LumaImageModifyNode(ComfyNodeABC):
             "content-type": "application/json"
         }
         
-        # Prepare payload for Luma API (image-to-image)
+        # Prepare payload for Luma API (image-to-image) with correct structure
         payload = {
             "prompt": prompt,
             "model": model,
-            "image": image_base64,
-            "image_weight": round(max(min(1.0-image_weight, 0.98), 0.0), 2)
+            "modify_image_ref": {
+                "url": image_url,
+                "weight": 0.8  # Hardcoded higher weight for testing
+            }
         }
         
         # Make direct API call to Luma
@@ -449,21 +484,48 @@ class LumaImageModifyNode(ComfyNodeABC):
                 result = status_response.json()
                 print(f"[DEBUG] Polling response: {result}")
             
+            # Clean up temp file after generation completes
+            # Note: Skip cleanup for Luma temp files as external servers may still need access
+            if not image_filename.startswith("luma_temp_"):
+                try:
+                    os.remove(image_filepath)
+                except:
+                    pass  # Ignore cleanup errors
+            
             # Now download the image
             if "assets" in result and "image" in result["assets"]:
-                image_url = result["assets"]["image"]
-                print(f"[DEBUG] Image URL: {image_url}")
-                img_response = requests.get(image_url, headers={"authorization": f"Bearer {luma_api_key}"})
+                image_url_result = result["assets"]["image"]
+                print(f"[DEBUG] Image URL: {image_url_result}")
+                img_response = requests.get(image_url_result, headers={"authorization": f"Bearer {luma_api_key}"})
                 img_response.raise_for_status()
                 print(f"[DEBUG] Image download status: {img_response.status_code}, content length: {len(img_response.content) if img_response.content else 'None'}")
                 img = process_image_response(img_response)
+                
+                # Clean up temporary file
+                # Note: Luma temp files are cleaned up after polling completes to allow server access
+                if not image_filename.startswith("luma_temp_"):
+                    try:
+                        os.remove(image_filepath)
+                    except:
+                        pass  # Ignore cleanup errors
+                
                 return (img,)
             else:
                 raise Exception(f"Unexpected response format: {result}")
                 
         except requests.exceptions.RequestException as e:
+            # Clean up temporary file on error
+            try:
+                os.remove(image_filepath)
+            except:
+                pass
             raise Exception(f"Luma API request failed: {str(e)}")
         except Exception as e:
+            # Clean up temporary file on error
+            try:
+                os.remove(image_filepath)
+            except:
+                pass
             raise Exception(f"Error processing Luma API response: {str(e)}")
 
 

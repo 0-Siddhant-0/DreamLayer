@@ -46,9 +46,6 @@ NODE_TO_API_KEY_MAPPING = {
     "GeminiNode": "GEMINI_API_KEY",
     "GeminiInputFiles": "GEMINI_API_KEY",
     
-    # Luma Photon Nodes (use direct API)
-    "LumaPhotonDepth2Img": "LUMA_API_KEY",
-    
     # Luma Image Node (direct API)
     "LumaImageNode": "LUMA_API_KEY",
     
