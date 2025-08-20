@@ -28,6 +28,8 @@ export interface RunConfig {
   version: string;
   generated_images: string[];
   generation_type: 'txt2img' | 'img2img';
+  // Enhanced with ClipScore from database integration
+  clip_score_mean?: number;
 }
 
 export interface RunRegistryResponse {
@@ -50,4 +52,4 @@ export interface RunRegistryActions {
   deleteRun: (runId: string) => Promise<void>;
   clearError: () => void;
   setSelectedRun: (run: RunConfig | null) => void;
-} 
+}

@@ -194,7 +194,10 @@ const ReportBundlePage: React.FC = () => {
                         <span>Seed: {run.seed}</span>
                         <span>Steps: {run.steps}</span>
                         <span>CFG: {run.cfg_scale}</span>
-                        <span>Images: {run.generated_images.length}</span>
+                        <span>Images: {run.generated_images?.length || 0}</span>
+                        {run.clip_score_mean !== null && (
+                          <span>ClipScore: {run.clip_score_mean?.toFixed(3) || "N/A"}</span>
+                        )}
                       </div>
                     </div>
                   </div>

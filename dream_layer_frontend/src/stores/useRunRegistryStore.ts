@@ -16,12 +16,45 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   fetchRuns: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/runs`);
-      const data = await response.json();
+      // Try consolidated enhanced API first (v2 with consolidated module)
+      let response = await fetch(`${API_BASE_URL}/runs/enhanced/v2`);
+      let data = await response.json();
+      
+      // Fallback to v1 enhanced API
+      if (!response.ok || data.status !== 'success') {
+        console.log('V2 enhanced API not available, trying V1...');
+        response = await fetch(`${API_BASE_URL}/runs/enhanced`);
+        data = await response.json();
+      }
+      
+      // Final fallback to regular API
+      if (!response.ok || data.status !== 'success') {
+        console.log('Enhanced APIs not available, falling back to regular API');
+        response = await fetch(`${API_BASE_URL}/runs`);
+        data = await response.json();
+      }
       
       if (data.status === 'success' && data.runs) {
-        const normalizedRuns = data.runs.map((run: any) => ({ ...run, loras: run.loras || [], controlnets: run.controlnets || [] }));
+        const normalizedRuns = data.runs.map((run: any) => ({ 
+          ...run, 
+          loras: run.loras || [], 
+          controlnets: run.controlnets || [],
+          // Ensure ClipScore is included (may be null for runs without it)
+          clip_score_mean: run.clip_score_mean || null
+        }));
         set({ runs: normalizedRuns, loading: false });
+        
+        // Log ClipScore availability for debugging
+        const runsWithClipScore = normalizedRuns.filter(run => run.clip_score_mean !== null);
+        const enhancementAvailable = data.enhancement_available || data.database_enabled;
+        
+        console.log(`✅ Loaded ${normalizedRuns.length} runs, ${runsWithClipScore.length} with ClipScore`);
+        console.log(`📊 Enhancement available: ${enhancementAvailable}`);
+        
+        if (enhancementAvailable && runsWithClipScore.length > 0) {
+          const avgClipScore = runsWithClipScore.reduce((sum, run) => sum + (run.clip_score_mean || 0), 0) / runsWithClipScore.length;
+          console.log(`📈 Average ClipScore: ${avgClipScore.toFixed(4)}`);
+        }
       } else {
         set({ error: data.message || 'Failed to fetch runs', loading: false });
       }
@@ -36,11 +69,32 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   fetchRun: async (runId: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
-      const data = await response.json();
+      // Try consolidated enhanced API first (v2)
+      let response = await fetch(`${API_BASE_URL}/runs/${runId}/enhanced/v2`);
+      let data = await response.json();
+      
+      // Fallback to v1 enhanced API
+      if (!response.ok || data.status !== 'success') {
+        response = await fetch(`${API_BASE_URL}/runs/${runId}/enhanced`);
+        data = await response.json();
+      }
+      
+      // Final fallback to regular API
+      if (!response.ok || data.status !== 'success') {
+        response = await fetch(`${API_BASE_URL}/runs/${runId}`);
+        data = await response.json();
+      }
       
       if (data.status === 'success' && data.run) {
-        set({ selectedRun: data.run, loading: false });
+        const normalizedRun = {
+          ...data.run,
+          loras: data.run.loras || [],
+          controlnets: data.run.controlnets || [],
+          clip_score_mean: data.run.clip_score_mean || null
+        };
+        set({ selectedRun: normalizedRun, loading: false });
+        
+        console.log(`✅ Loaded run ${runId} with ClipScore: ${normalizedRun.clip_score_mean || 'N/A'}`);
       } else {
         set({ error: data.message || 'Failed to fetch run', loading: false });
       }
@@ -53,6 +107,7 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   },
 
   deleteRun: async (runId: string) => {
+    set({ loading: true, error: null });
     try {
       const response = await fetch(`${API_BASE_URL}/runs/${runId}`, {
         method: 'DELETE',
@@ -60,16 +115,18 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
       const data = await response.json();
       
       if (data.status === 'success') {
-        // Remove the run from the local state
-        const { runs } = get();
-        const updatedRuns = runs.filter(run => run.run_id !== runId);
-        set({ runs: updatedRuns });
+        const currentRuns = get().runs;
+        set({ 
+          runs: currentRuns.filter(run => run.run_id !== runId),
+          loading: false 
+        });
       } else {
-        set({ error: data.message || 'Failed to delete run' });
+        set({ error: data.message || 'Failed to delete run', loading: false });
       }
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to delete run'
+        error: error instanceof Error ? error.message : 'Failed to delete run', 
+        loading: false 
       });
     }
   },
@@ -81,4 +138,4 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   setSelectedRun: (run: RunConfig | null) => {
     set({ selectedRun: run });
   },
-})); 
+}));
