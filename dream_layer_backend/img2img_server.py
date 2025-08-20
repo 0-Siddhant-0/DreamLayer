@@ -14,6 +14,7 @@ from shared_utils import COMFY_API_URL
 from dream_layer_backend_utils.fetch_advanced_models import get_controlnet_models
 from run_registry import create_run_config_from_generation_data
 from dataclasses import asdict
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -224,23 +225,36 @@ def handle_img2img():
                 if isinstance(img_data, dict) and "filename" in img_data:
                     generated_images.append(img_data["filename"])
         
-        # Register the completed run
+        # Register the completed run with direct database integration
         try:
-            run_config = create_run_config_from_generation_data(
-                data, generated_images, "img2img"
-            )
+            # Try direct database save first
+            try:
+                from dream_layer_backend_utils.direct_database_integration import save_generation_run
+                success = save_generation_run(data, generated_images, "img2img")
+                if success:
+                    logger.info(f"✅ Run registered via database")
+                    continue_with_api = False
+                else:
+                    continue_with_api = True
+            except ImportError:
+                continue_with_api = True
             
-            # Send to run registry
-            registry_response = requests.post(
-                "http://localhost:5005/api/runs",
-                json=asdict(run_config),
-                timeout=5
-            )
-            
-            if registry_response.status_code == 200:
-                logger.info(f"✅ Run registered successfully: {run_config.run_id}")
-            else:
-                logger.warning(f"⚠️ Failed to register run: {registry_response.text}")
+            # Fallback to API if database fails
+            if continue_with_api:
+                run_config = create_run_config_from_generation_data(
+                    data, generated_images, "img2img"
+                )
+                
+                registry_response = requests.post(
+                    "http://localhost:5005/api/runs",
+                    json=asdict(run_config),
+                    timeout=5
+                )
+                
+                if registry_response.status_code == 200:
+                    logger.info(f"✅ Run registered via API: {run_config.run_id}")
+                else:
+                    logger.warning(f"⚠️ Failed to register run: {registry_response.text}")
                 
         except Exception as e:
             logger.warning(f"⚠️ Error registering run: {str(e)}")
