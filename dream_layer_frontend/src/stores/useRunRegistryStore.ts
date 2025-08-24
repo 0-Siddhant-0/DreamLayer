@@ -39,8 +39,9 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
           ...run, 
           loras: run.loras || [], 
           controlnets: run.controlnets || [],
-          // Ensure ClipScore is included (may be null for runs without it)
-          clip_score_mean: run.clip_score_mean || null
+          // Ensure metrics are included (may be null for runs without them)
+          clip_score_mean: run.clip_score_mean || null,
+          fid_score: run.fid_score || null
         }));
         set({ runs: normalizedRuns, loading: false });
         
@@ -90,7 +91,8 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
           ...data.run,
           loras: data.run.loras || [],
           controlnets: data.run.controlnets || [],
-          clip_score_mean: data.run.clip_score_mean || null
+          clip_score_mean: data.run.clip_score_mean || null,
+          fid_score: data.run.fid_score || null
         };
         set({ selectedRun: normalizedRun, loading: false });
         

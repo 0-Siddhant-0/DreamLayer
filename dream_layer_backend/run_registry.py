@@ -352,11 +352,15 @@ def get_runs_enhanced():
 
 @app.route('/api/runs/enhanced/v2', methods=['GET'])
 def get_runs_enhanced_v2():
-    """Get all completed runs with ClipScore data (v2 - unified queries)"""
+    """Get all completed runs with all metrics (ClipScore, FiD, etc.) - v2 unified queries"""
     try:
-        from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_clipscore
+        from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_metrics
+        from database_integration import ensure_fid_scores_calculated
         
-        enhanced_runs = get_all_runs_with_clipscore()
+        # Ensure FiD scores are calculated for all runs
+        ensure_fid_scores_calculated()
+        
+        enhanced_runs = get_all_runs_with_metrics()
         
         return jsonify({
             "status": "success",
@@ -364,6 +368,7 @@ def get_runs_enhanced_v2():
             "database_enabled": DATABASE_ENABLED,
             "enhancement_available": True,
             "count": len(enhanced_runs),
+            "metrics_included": ["clip_score_mean", "fid_score"],
             "version": "v2"
         })
     except Exception as e:
@@ -399,11 +404,11 @@ def get_run_enhanced(run_id: str):
 
 @app.route('/api/runs/<run_id>/enhanced/v2', methods=['GET'])
 def get_run_enhanced_v2(run_id: str):
-    """Get a specific run by ID with ClipScore data (v2 - unified queries)"""
+    """Get a specific run by ID with all metrics (ClipScore, FiD, etc.) - v2 unified queries"""
     try:
-        from dream_layer_backend_utils.unified_database_queries import get_single_run_with_clipscore
+        from dream_layer_backend_utils.unified_database_queries import get_single_run_with_metrics
         
-        enhanced_run = get_single_run_with_clipscore(run_id)
+        enhanced_run = get_single_run_with_metrics(run_id)
         
         if enhanced_run:
             return jsonify({
@@ -411,7 +416,59 @@ def get_run_enhanced_v2(run_id: str):
                 "run": enhanced_run,
                 "database_enabled": DATABASE_ENABLED,
                 "enhancement_available": True,
+                "metrics_included": ["clip_score_mean", "fid_score"],
                 "version": "v2"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Run not found"
+            }), 404
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/api/runs/enhanced/metrics', methods=['GET'])
+def get_runs_enhanced_metrics():
+    """Get all completed runs with all metrics (ClipScore and FiD)"""
+    try:
+        from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_metrics
+        
+        enhanced_runs = get_all_runs_with_metrics()
+        
+        return jsonify({
+            "status": "success",
+            "runs": enhanced_runs,
+            "database_enabled": DATABASE_ENABLED,
+            "enhancement_available": True,
+            "count": len(enhanced_runs),
+            "metrics_included": ["clip_score_mean", "fid_score"],
+            "version": "metrics"
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/api/runs/<run_id>/enhanced/metrics', methods=['GET'])
+def get_run_enhanced_metrics(run_id: str):
+    """Get a specific run by ID with all metrics (ClipScore and FiD)"""
+    try:
+        from dream_layer_backend_utils.unified_database_queries import get_single_run_with_metrics
+        
+        enhanced_run = get_single_run_with_metrics(run_id)
+        
+        if enhanced_run:
+            return jsonify({
+                "status": "success",
+                "run": enhanced_run,
+                "database_enabled": DATABASE_ENABLED,
+                "enhancement_available": True,
+                "metrics_included": ["clip_score_mean", "fid_score"],
+                "version": "metrics"
             })
         else:
             return jsonify({

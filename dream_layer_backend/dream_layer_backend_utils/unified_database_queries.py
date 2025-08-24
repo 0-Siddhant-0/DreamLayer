@@ -22,13 +22,14 @@ def get_all_runs_with_clipscore() -> List[Dict[str, Any]]:
         db = get_database_connection()
         
         with db.get_connection() as conn:
-            # Single unified query that joins runs with metrics
+            # Single unified query that joins runs with metrics (NEW SCHEMA)
             cursor = conn.execute("""
                 SELECT 
                     r.*,
-                    m.metric_value as clip_score_mean
+                    m.clip_score_mean,
+                    m.fid_score
                 FROM runs r
-                LEFT JOIN metrics m ON r.run_id = m.run_id AND m.metric_name = 'clip_score_mean'
+                LEFT JOIN metrics m ON r.run_id = m.run_id
                 ORDER BY r.timestamp DESC
             """)
             
@@ -81,9 +82,10 @@ def get_single_run_with_clipscore(run_id: str) -> Optional[Dict[str, Any]]:
             cursor = conn.execute("""
                 SELECT 
                     r.*,
-                    m.metric_value as clip_score_mean
+                    m.clip_score_mean,
+                    m.fid_score
                 FROM runs r
-                LEFT JOIN metrics m ON r.run_id = m.run_id AND m.metric_name = 'clip_score_mean'
+                LEFT JOIN metrics m ON r.run_id = m.run_id
                 WHERE r.run_id = ?
             """, (run_id,))
             
@@ -117,6 +119,114 @@ def get_single_run_with_clipscore(run_id: str) -> Optional[Dict[str, Any]]:
             
     except Exception as e:
         print(f"Error getting run {run_id} with ClipScore: {e}")
+        return None
+
+def get_all_runs_with_metrics() -> List[Dict[str, Any]]:
+    """
+    Unified query to get all runs with all metrics (ClipScore and FiD)
+    Used by: run_registry.py, report_bundle.py, frontend APIs
+    """
+    try:
+        db = get_database_connection()
+        
+        with db.get_connection() as conn:
+            # Single unified query that joins runs with metrics (NEW SCHEMA)
+            cursor = conn.execute("""
+                SELECT 
+                    r.*,
+                    m.clip_score_mean,
+                    m.fid_score
+                FROM runs r
+                LEFT JOIN metrics m ON r.run_id = m.run_id
+                ORDER BY r.timestamp DESC
+            """)
+            
+            runs = []
+            for row in cursor.fetchall():
+                run_dict = dict(row)
+                # Convert JSON strings back to objects and ensure arrays exist
+                for field in ['loras', 'controlnets', 'workflow']:
+                    if run_dict.get(field):
+                        try:
+                            import json
+                            run_dict[field] = json.loads(run_dict[field])
+                        except (json.JSONDecodeError, TypeError):
+                            run_dict[field] = [] if field != 'workflow' else {}
+                    else:
+                        run_dict[field] = [] if field != 'workflow' else {}
+                
+                # Ensure generated_images is an array
+                if not run_dict.get('generated_images'):
+                    run_dict['generated_images'] = []
+                elif isinstance(run_dict['generated_images'], str):
+                    try:
+                        import json
+                        run_dict['generated_images'] = json.loads(run_dict['generated_images'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If it's a single filename string, convert to array
+                        run_dict['generated_images'] = [run_dict['generated_images']] if run_dict['generated_images'] else []
+                
+                # Ensure it's always a list
+                if not isinstance(run_dict['generated_images'], list):
+                    run_dict['generated_images'] = []
+                
+                runs.append(run_dict)
+            
+            return runs
+            
+    except Exception as e:
+        print(f"Error getting runs with metrics: {e}")
+        return []
+
+def get_single_run_with_metrics(run_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Unified query to get single run with all metrics (ClipScore and FiD)
+    Used by: run_registry.py, report_bundle.py
+    """
+    try:
+        db = get_database_connection()
+        
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT 
+                    r.*,
+                    m.clip_score_mean,
+                    m.fid_score
+                FROM runs r
+                LEFT JOIN metrics m ON r.run_id = m.run_id
+                WHERE r.run_id = ?
+            """, (run_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            run_dict = dict(row)
+            # Convert JSON strings back to objects and ensure arrays exist
+            for field in ['loras', 'controlnets', 'workflow']:
+                if run_dict.get(field):
+                    try:
+                        import json
+                        run_dict[field] = json.loads(run_dict[field])
+                    except (json.JSONDecodeError, TypeError):
+                        run_dict[field] = [] if field != 'workflow' else {}
+                else:
+                    run_dict[field] = [] if field != 'workflow' else {}
+            
+            # Ensure generated_images is an array
+            if not run_dict.get('generated_images'):
+                run_dict['generated_images'] = []
+            elif isinstance(run_dict['generated_images'], str):
+                try:
+                    import json
+                    run_dict['generated_images'] = json.loads(run_dict['generated_images'])
+                except (json.JSONDecodeError, TypeError):
+                    run_dict['generated_images'] = [run_dict['generated_images']] if run_dict['generated_images'] else []
+            
+            return run_dict
+            
+    except Exception as e:
+        print(f"Error getting run {run_id} with metrics: {e}")
         return None
 
 def save_run_to_database(run_data: Dict[str, Any]) -> bool:
@@ -154,23 +264,36 @@ def save_assets_to_database(run_id: str, timestamp: str, generated_images: List[
 
 def save_clipscore_to_database(run_id: str, timestamp: str, clip_score: float) -> bool:
     """
-    Unified function to save ClipScore to database
+    Unified function to save ClipScore to database (NEW SCHEMA)
     Used by: ClipScore calculation modules
     """
     try:
-        db = get_database_connection()
+        # Use the new upsert_metric method
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data', 'scripts'))
+        from queries import DreamLayerQueries
         
-        with db.get_connection() as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO metrics (
-                    run_id, timestamp, metric_name, metric_value
-                ) VALUES (?, ?, ?, ?)
-            """, (run_id, timestamp, 'clip_score_mean', clip_score))
-            conn.commit()
+        queries = DreamLayerQueries()
+        return queries.save_clip_score(run_id, timestamp, clip_score)
         
-        return True
     except Exception as e:
         print(f"Error saving ClipScore to database: {e}")
+        return False
+
+def save_fidscore_to_database(run_id: str, timestamp: str, fid_score: float) -> bool:
+    """
+    Unified function to save FID score to database (NEW SCHEMA)
+    Used by: FID calculation modules
+    """
+    try:
+        # Use the new upsert_metric method
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data', 'scripts'))
+        from queries import DreamLayerQueries
+        
+        queries = DreamLayerQueries()
+        return queries.save_fid_score(run_id, timestamp, fid_score)
+        
+    except Exception as e:
+        print(f"Error saving FID score to database: {e}")
         return False
 
 def get_database_stats() -> Dict[str, Any]:

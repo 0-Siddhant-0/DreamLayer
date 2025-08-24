@@ -198,6 +198,9 @@ const ReportBundlePage: React.FC = () => {
                         {run.clip_score_mean !== null && (
                           <span>ClipScore: {run.clip_score_mean?.toFixed(3) || "N/A"}</span>
                         )}
+                        {run.fid_score !== null && (
+                          <span>FID: {run.fid_score?.toFixed(3) || "N/A"}</span>
+                        )}
                       </div>
                     </div>
                   </div>

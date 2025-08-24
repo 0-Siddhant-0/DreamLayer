@@ -13,9 +13,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(script_dir, 'data', 'scripts'))
 
 try:
-    from queries import DreamLayerQueries, get_csv_data
-    from clip_integration import calculate_missing_clip_scores
-    from migration import DreamLayerMigration
+    from data.scripts.queries import DreamLayerQueries, get_csv_data
+    from data.scripts.clip_integration import calculate_missing_clip_scores
+    from data.scripts.fid_integration import calculate_missing_fid_scores
+    from data.scripts.migration import DreamLayerMigration
     DATABASE_AVAILABLE = True
 except ImportError as e:
     print(f"Database not available: {e}")
@@ -62,6 +63,14 @@ class DatabaseIntegration:
         except Exception as e:
             print(f"ClipScore calculation error: {e}")
         
+        # Calculate missing FiD scores
+        try:
+            fid_stats = calculate_missing_fid_scores(limit=50)
+            if fid_stats['success'] > 0:
+                print(f"Calculated FiD for {fid_stats['success']} additional runs")
+        except Exception as e:
+            print(f"FiD calculation error: {e}")
+        
         # Get CSV data
         return get_csv_data(limit)
     
@@ -106,6 +115,17 @@ def ensure_clip_scores_calculated():
             return stats
         except Exception as e:
             print(f"Error calculating ClipScores: {e}")
+            return {"error": str(e)}
+    return {"error": "Database not available"}
+
+def ensure_fid_scores_calculated():
+    """Convenience function to calculate missing FiD scores"""
+    if db_integration.is_database_enabled():
+        try:
+            stats = calculate_missing_fid_scores(limit=100)
+            return stats
+        except Exception as e:
+            print(f"Error calculating FiD scores: {e}")
             return {"error": str(e)}
     return {"error": "Database not available"}
 

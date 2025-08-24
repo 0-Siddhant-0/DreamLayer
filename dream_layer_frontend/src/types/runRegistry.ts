@@ -28,8 +28,9 @@ export interface RunConfig {
   version: string;
   generated_images: string[];
   generation_type: 'txt2img' | 'img2img';
-  // Enhanced with ClipScore from database integration
+  // Enhanced with metrics from database integration
   clip_score_mean?: number;
+  fid_score?: number;
 }
 
 export interface RunRegistryResponse {
