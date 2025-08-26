@@ -162,7 +162,7 @@ def create_run_config_from_generation_data(generation_data: Dict[str, Any],
     return RunConfig(
         run_id=str(uuid.uuid4()),
         timestamp=datetime.now().isoformat(),
-        model=generation_data.get('model', 'unknown'),
+        model=generation_data.get('model_name', 'unknown'),
         vae=generation_data.get('vae'),
         loras=generation_data.get('loras', []),
         controlnets=generation_data.get('controlnets', []),
