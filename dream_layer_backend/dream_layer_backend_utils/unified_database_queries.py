@@ -123,21 +123,28 @@ def get_single_run_with_clipscore(run_id: str) -> Optional[Dict[str, Any]]:
 
 def get_all_runs_with_metrics() -> List[Dict[str, Any]]:
     """
-    Unified query to get all runs with all metrics (ClipScore and FiD)
+    Unified query to get all runs with all metrics (ClipScore, FiD, and Composition)
     Used by: run_registry.py, report_bundle.py, frontend APIs
     """
     try:
         db = get_database_connection()
         
         with db.get_connection() as conn:
-            # Single unified query that joins runs with metrics (NEW SCHEMA)
+            # Single unified query that joins runs with all metrics tables
             cursor = conn.execute("""
                 SELECT 
                     r.*,
                     m.clip_score_mean,
-                    m.fid_score
+                    m.fid_score,
+                    cm.macro_precision,
+                    cm.macro_recall,
+                    cm.macro_f1,
+                    cm.per_class_metrics,
+                    cm.detected_objects,
+                    cm.missing_objects
                 FROM runs r
                 LEFT JOIN metrics m ON r.run_id = m.run_id
+                LEFT JOIN composition_metrics cm ON r.run_id = cm.run_id
                 ORDER BY r.timestamp DESC
             """)
             
@@ -170,6 +177,17 @@ def get_all_runs_with_metrics() -> List[Dict[str, Any]]:
                 if not isinstance(run_dict['generated_images'], list):
                     run_dict['generated_images'] = []
                 
+                # Parse composition metrics JSON fields
+                for field in ['per_class_metrics', 'detected_objects', 'missing_objects']:
+                    if run_dict.get(field):
+                        try:
+                            import json
+                            run_dict[field] = json.loads(run_dict[field])
+                        except (json.JSONDecodeError, TypeError):
+                            run_dict[field] = {}
+                    else:
+                        run_dict[field] = {}
+                
                 runs.append(run_dict)
             
             return runs
@@ -180,7 +198,7 @@ def get_all_runs_with_metrics() -> List[Dict[str, Any]]:
 
 def get_single_run_with_metrics(run_id: str) -> Optional[Dict[str, Any]]:
     """
-    Unified query to get single run with all metrics (ClipScore and FiD)
+    Unified query to get single run with all metrics (ClipScore, FiD, and Composition)
     Used by: run_registry.py, report_bundle.py
     """
     try:
@@ -191,9 +209,16 @@ def get_single_run_with_metrics(run_id: str) -> Optional[Dict[str, Any]]:
                 SELECT 
                     r.*,
                     m.clip_score_mean,
-                    m.fid_score
+                    m.fid_score,
+                    cm.macro_precision,
+                    cm.macro_recall,
+                    cm.macro_f1,
+                    cm.per_class_metrics,
+                    cm.detected_objects,
+                    cm.missing_objects
                 FROM runs r
                 LEFT JOIN metrics m ON r.run_id = m.run_id
+                LEFT JOIN composition_metrics cm ON r.run_id = cm.run_id
                 WHERE r.run_id = ?
             """, (run_id,))
             
@@ -222,6 +247,17 @@ def get_single_run_with_metrics(run_id: str) -> Optional[Dict[str, Any]]:
                     run_dict['generated_images'] = json.loads(run_dict['generated_images'])
                 except (json.JSONDecodeError, TypeError):
                     run_dict['generated_images'] = [run_dict['generated_images']] if run_dict['generated_images'] else []
+            
+            # Parse composition metrics JSON fields
+            for field in ['per_class_metrics', 'detected_objects', 'missing_objects']:
+                if run_dict.get(field):
+                    try:
+                        import json
+                        run_dict[field] = json.loads(run_dict[field])
+                    except (json.JSONDecodeError, TypeError):
+                        run_dict[field] = {}
+                else:
+                    run_dict[field] = {}
             
             return run_dict
             

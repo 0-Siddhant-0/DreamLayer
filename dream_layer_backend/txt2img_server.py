@@ -87,36 +87,17 @@ def handle_txt2img():
                         generated_images.append(img_data["filename"])
             
             print("Start register process")
-            # Register the completed run with direct database integration
+            # Register the completed run using the same working system as POST /api/runs
             try:
-                # Try direct database save first
-                try:
-                    from dream_layer_backend_utils.direct_database_integration import save_generation_run
-                    success = save_generation_run(data, generated_images, "txt2img")
-                    if success:
-                        print(f"✅ Run registered via database")
-                        continue_with_api = False
-                    else:
-                        continue_with_api = True
-                except ImportError:
-                    continue_with_api = True
+                # Use the same working registration function as the API endpoint
+                from run_registry import registry
+                run_config = create_run_config_from_generation_data(
+                    data, generated_images, "txt2img"
+                )
                 
-                # Fallback to API if database fails
-                if continue_with_api:
-                    run_config = create_run_config_from_generation_data(
-                        data, generated_images, "txt2img"
-                    )
-                    
-                    registry_response = requests.post(
-                        "http://localhost:5005/api/runs",
-                        json=asdict(run_config),
-                        timeout=5
-                    )
-                    
-                    if registry_response.status_code == 200:
-                        print(f"✅ Run registered via API: {run_config.run_id}")
-                    else:
-                        print(f"⚠️ Failed to register run: {registry_response.text}")
+                # This is the SAME function used by POST /api/runs (includes real-time metrics)
+                registry.add_run(run_config)
+                print(f"✅ Run registered with real-time metrics: {run_config.run_id}")
                     
             except Exception as e:
                 print(f"⚠️ Error registering run: {str(e)}")

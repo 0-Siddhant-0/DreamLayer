@@ -31,6 +31,10 @@ export interface RunConfig {
   // Enhanced with metrics from database integration
   clip_score_mean?: number;
   fid_score?: number;
+  // Composition correctness metrics
+  macro_precision?: number;
+  macro_recall?: number;
+  macro_f1?: number;
 }
 
 export interface RunRegistryResponse {

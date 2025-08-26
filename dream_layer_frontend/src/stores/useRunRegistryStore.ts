@@ -41,7 +41,11 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
           controlnets: run.controlnets || [],
           // Ensure metrics are included (may be null for runs without them)
           clip_score_mean: run.clip_score_mean || null,
-          fid_score: run.fid_score || null
+          fid_score: run.fid_score || null,
+          // Composition metrics
+          macro_precision: run.macro_precision || null,
+          macro_recall: run.macro_recall || null,
+          macro_f1: run.macro_f1 || null
         }));
         set({ runs: normalizedRuns, loading: false });
         
