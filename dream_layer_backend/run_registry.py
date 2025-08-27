@@ -299,41 +299,8 @@ def add_run():
         # Save to both database and JSON
         registry.add_run(run_config)
         
-        # Trigger composition metrics calculation for the new run (real-time)
-        # This runs in background and won't break run registration if it fails
-        if DATABASE_ENABLED and db_integration.is_database_enabled():
-            try:
-                # Import and calculate composition metrics without changing working directory
-                import sys
-                import os
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                data_scripts_path = os.path.join(script_dir, 'data', 'scripts')
-                if data_scripts_path not in sys.path:
-                    sys.path.append(data_scripts_path)
-                
-                # Import with absolute path resolution
-                from composition_integration import compute_composition_metrics_for_run
-                
-                # Run in background thread to avoid blocking the response
-                import threading
-                def calculate_metrics():
-                    try:
-                        logger.info(f"Background: Calculating composition metrics for run {run_config.run_id}")
-                        metrics_result = compute_composition_metrics_for_run(run_config.run_id)
-                        if metrics_result:
-                            logger.info(f"✅ Background: Composition metrics calculated for run {run_config.run_id}: F1={metrics_result['macro_f1']:.3f}")
-                        else:
-                            logger.warning(f"⚠️ Background: Composition metrics calculation failed for run {run_config.run_id}")
-                    except Exception as bg_e:
-                        logger.error(f"Background: Error calculating composition metrics for run {run_config.run_id}: {bg_e}")
-                
-                # Start background calculation
-                thread = threading.Thread(target=calculate_metrics, daemon=True)
-                thread.start()
-                
-            except Exception as e:
-                # Don't let composition metrics errors break run registration
-                logger.error(f"Error setting up composition metrics calculation for run {run_config.run_id}: {e}")
+        # All metrics will be calculated on-demand when accessing Run Registry or Report Bundle
+        logger.info(f"Run {run_config.run_id} registered successfully. Metrics will be calculated on-demand.")
         
         return jsonify({
             "status": "success",
@@ -396,9 +363,10 @@ def get_runs_enhanced_v2():
     """Get all completed runs with all metrics (ClipScore, FiD, Composition) - v2 unified queries"""
     try:
         from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_metrics
-        from database_integration import ensure_fid_scores_calculated, ensure_composition_metrics_calculated
+        from database_integration import ensure_fid_scores_calculated, ensure_composition_metrics_calculated, ensure_clip_scores_calculated
         
         # Ensure all metrics are calculated for all runs
+        ensure_clip_scores_calculated()
         ensure_fid_scores_calculated()
         ensure_composition_metrics_calculated()
         

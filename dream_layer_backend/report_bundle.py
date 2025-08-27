@@ -140,6 +140,18 @@ class ReportBundleGenerator:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         bundle_name = f"dreamlayer_report_{timestamp}"
         
+        # Ensure all metrics are calculated before generating report
+        try:
+            from database_integration import ensure_clip_scores_calculated, ensure_fid_scores_calculated, ensure_composition_metrics_calculated
+            
+            print("🔄 Calculating missing metrics for report...")
+            ensure_clip_scores_calculated()
+            ensure_fid_scores_calculated()
+            ensure_composition_metrics_calculated()
+            print("✅ Metrics calculation complete")
+        except Exception as e:
+            print(f"⚠️ Metrics calculation error: {e}")
+        
         # Generate files
         csv_path = self.generate_csv()
         config_path = self.generate_config_json()
@@ -190,7 +202,7 @@ def generate_report_bundle_api():
         
         return jsonify({
             'success': True,
-            'download_url': f'/api/report-bundle/download/{os.path.basename(bundle_path)}',
+            'download_url': f'http://localhost:5006/api/report-bundle/download/{os.path.basename(bundle_path)}',
             'bundle_path': bundle_path,
             'enhancement_available': ENHANCEMENT_AVAILABLE
         })
