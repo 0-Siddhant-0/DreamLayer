@@ -11,3 +11,10 @@ torch>=2.0.0
 torchvision>=0.15.0
 torchmetrics>=1.0.0
 scipy>=1.10.0
+# YOLO for composition metrics
+ultralytics>=8.0.0
+# CLIP for ClipScore calculation
+transformers>=4.30.0
+open-clip-torch>=2.20.0
+# Additional image processing
+opencv-python>=4.8.0
