@@ -34,13 +34,17 @@ class ReportBundleGenerator:
         # Keep registry only for fallback, primary source is database
         self.registry = RunRegistry() if REGISTRY_AVAILABLE else None
         
-    def get_enhanced_runs_data(self, limit: int = None) -> List[Dict[str, Any]]:
+    def get_enhanced_runs_data(self, limit: int = None, run_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Get runs data from database (not JSON registry)"""
         try:
-            from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_clipscore
+            from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_metrics
             
             # Primary: Read from database
-            enhanced_runs = get_all_runs_with_clipscore()
+            enhanced_runs = get_all_runs_with_metrics()
+            
+            # Filter by run_ids if provided
+            if run_ids:
+                enhanced_runs = [run for run in enhanced_runs if run.get('run_id') in run_ids]
             
             if limit:
                 enhanced_runs = enhanced_runs[:limit]
@@ -68,7 +72,7 @@ class ReportBundleGenerator:
     def generate_csv(self, runs: List = None) -> str:
         """Generate CSV with metrics data (ClipScore focused)"""
         csv_path = "results.csv"
-        enhanced_runs = self.get_enhanced_runs_data()
+        enhanced_runs = self.get_enhanced_runs_data(run_ids=runs)
         
         if not enhanced_runs:
             # Create empty CSV
@@ -81,7 +85,7 @@ class ReportBundleGenerator:
         columns = [
             'run_id', 'timestamp', 'model', 'prompt', 'negative_prompt',
             'seed', 'steps', 'cfg_scale', 'width', 'height',
-            'image_count', 'clip_score_mean'
+            'image_count', 'clip_score_mean', 'fid_score', 'macro_precision', 'macro_recall', 'macro_f1'
         ]
         
         # Write CSV
@@ -106,7 +110,7 @@ class ReportBundleGenerator:
     def generate_config_json(self, runs: List = None) -> str:
         """Generate config JSON with runs data"""
         config_path = "config.json"
-        enhanced_runs = self.get_enhanced_runs_data()
+        enhanced_runs = self.get_enhanced_runs_data(run_ids=runs)
         
         # Create runs config (full run data)
         config_data = {
@@ -135,7 +139,7 @@ class ReportBundleGenerator:
         print(f"✅ Generated config.json with {len(enhanced_runs)} runs")
         return config_path
     
-    def generate_bundle(self, limit: int = None, include_images: bool = True) -> str:
+    def generate_bundle(self, limit: int = None, include_images: bool = True, run_ids: List[str] = None) -> str:
         """Generate complete report bundle"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         bundle_name = f"dreamlayer_report_{timestamp}"
@@ -153,8 +157,8 @@ class ReportBundleGenerator:
             print(f"⚠️ Metrics calculation error: {e}")
         
         # Generate files
-        csv_path = self.generate_csv()
-        config_path = self.generate_config_json()
+        csv_path = self.generate_csv(run_ids)
+        config_path = self.generate_config_json(run_ids)
         
         # Create ZIP bundle with Mac compatibility
         zip_path = f"{bundle_name}.zip"
@@ -163,7 +167,7 @@ class ReportBundleGenerator:
             zipf.write(config_path, "config.json")
             
             if include_images:
-                self.add_images_to_zip(zipf)
+                self.add_images_to_zip(zipf, run_ids)
         
         # Cleanup temp files
         for temp_file in [csv_path, config_path]:
@@ -173,9 +177,9 @@ class ReportBundleGenerator:
         print(f"✅ Generated bundle: {zip_path}")
         return zip_path
     
-    def add_images_to_zip(self, zipf: zipfile.ZipFile):
+    def add_images_to_zip(self, zipf: zipfile.ZipFile, run_ids: List[str] = None):
         """Add image files to ZIP bundle"""
-        enhanced_runs = self.get_enhanced_runs_data()
+        enhanced_runs = self.get_enhanced_runs_data(run_ids=run_ids)
         added_images = set()
         
         for run in enhanced_runs:
@@ -198,7 +202,7 @@ def generate_report_bundle_api():
         include_images = data.get('include_images', True)
         
         generator = ReportBundleGenerator()
-        bundle_path = generator.generate_bundle(include_images=include_images)
+        bundle_path = generator.generate_bundle(include_images=include_images, run_ids=run_ids)
         
         return jsonify({
             'success': True,
