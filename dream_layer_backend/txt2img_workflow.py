@@ -60,6 +60,9 @@ def transform_to_txt2img_workflow(data):
         except (ValueError, TypeError):
             seed = random.randint(0, 2**32 - 1)
 
+        # Update the data with the actual seed used
+        data['seed'] = seed
+
         # Handle model name validation
         model_name = data.get('model_name', 'juggernautXL_v8Rundiffusion.safetensors')
         
