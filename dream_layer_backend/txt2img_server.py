@@ -44,7 +44,7 @@ def handle_txt2img():
             print("-"*20)
             print(f"Prompt: {data.get('prompt', 'Not provided')}")
             print(f"Negative Prompt: {data.get('negative_prompt', 'Not provided')}")
-            print(f"Batch Size: {data.get('batch_size', 'Not provided')}")
+            print(f"Batch Count: {data.get('batch_count', 1)}")
             
             # Check ControlNet data specifically
             controlnet_data = data.get('controlnet', {})
@@ -63,51 +63,60 @@ def handle_txt2img():
             else:
                 print("No ControlNet units found")
             
-            # Transform to ComfyUI workflow
-
-            workflow = transform_to_txt2img_workflow(data)
-            print("\nGenerated ComfyUI Workflow:")
-            print("-"*20)
-            print(json.dumps(workflow, indent=2))
+            # Extract batch_count and implement loop
+            batch_count = data.get('batch_count', 1)
+            all_generated_images = []
             
-            # Send to ComfyUI server
-            comfy_response = send_to_comfyui(workflow)
-            
-            if "error" in comfy_response:
-                return jsonify({
-                    "status": "error",
-                    "message": comfy_response["error"]
-                }), 500
-            
-            # Extract generated image filenames
-            generated_images = []
-            if comfy_response.get("all_images"):
-                for img_data in comfy_response["all_images"]:
-                    if isinstance(img_data, dict) and "filename" in img_data:
-                        generated_images.append(img_data["filename"])
-            
-            print("Start register process")
-            # Register the completed run using the same working system as POST /api/runs
-            try:
-                # Use the same working registration function as the API endpoint
-                from run_registry import registry
-                run_config = create_run_config_from_generation_data(
-                    data, generated_images, "txt2img"
-                )
-                
-                # This is the SAME function used by POST /api/runs (includes real-time metrics)
-                registry.add_run(run_config)
-                print(f"✅ Run registered with real-time metrics: {run_config.run_id}")
+            for iteration in range(batch_count):
+                try:
+                    print(f"\n🔄 Batch iteration {iteration + 1}/{batch_count}")
                     
-            except Exception as e:
-                print(f"⚠️ Error registering run: {str(e)}")
+                    # Generate new random seed for each iteration
+                    iteration_data = data.copy()
+                    iteration_data['seed'] = -1  # Force new random seed
+                    
+                    # Transform to ComfyUI workflow
+                    workflow = transform_to_txt2img_workflow(iteration_data)
+                    print(f"Generated ComfyUI Workflow for iteration {iteration + 1}")
+                    
+                    # Send to ComfyUI server
+                    comfy_response = send_to_comfyui(workflow)
+                    
+                    if "error" in comfy_response:
+                        print(f"⚠️ Error in iteration {iteration + 1}: {comfy_response['error']}")
+                        continue  # Continue with next iteration
+                    
+                    # Extract generated image filenames
+                    generated_images = []
+                    if comfy_response.get("all_images"):
+                        for img_data in comfy_response["all_images"]:
+                            if isinstance(img_data, dict) and "filename" in img_data:
+                                generated_images.append(img_data["filename"])
+                        all_generated_images.extend(comfy_response["all_images"])
+                    
+                    print(f"Registering run for iteration {iteration + 1}")
+                    # Register the completed run - each iteration gets unique run_id
+                    try:
+                        from run_registry import registry
+                        run_config = create_run_config_from_generation_data(
+                            iteration_data, generated_images, "txt2img"
+                        )
+                        registry.add_run(run_config)
+                        print(f"✅ Run registered with unique run_id: {run_config.run_id}")
+                    except Exception as e:
+                        print(f"⚠️ Error registering run for iteration {iteration + 1}: {str(e)}")
+                        
+                except Exception as e:
+                    print(f"⚠️ Error in iteration {iteration + 1}: {str(e)}")
+                    continue  # Continue with next iteration
             
             response = jsonify({
                 "status": "success",
                 "message": "Workflow sent to ComfyUI successfully",
-                "comfy_response": comfy_response,
-                "generated_images": comfy_response.get("all_images", []),
-                "run_id": run_config.run_id if 'run_config' in locals() else None
+                "comfy_response": {
+                    "all_images": all_generated_images
+                },
+                "generated_images": all_generated_images
             })
             
             return response

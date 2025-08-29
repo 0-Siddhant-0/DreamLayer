@@ -210,8 +210,8 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
       const data = await response.json();
       console.log('Response data:', data);
 
-      if (data.comfy_response?.generated_images) {
-        const images = data.comfy_response.generated_images.map((img: any) => {
+      if (data.generated_images) {
+        const images = data.generated_images.map((img: any) => {
           // Use the URL directly from the response
           const imageUrl = img.url;
           

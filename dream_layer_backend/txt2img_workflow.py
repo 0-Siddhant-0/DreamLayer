@@ -55,10 +55,10 @@ def transform_to_txt2img_workflow(data):
         try:
             seed = int(data.get('seed', 0))
             if seed < 0:
-                # Generate random seed between 0 and 2^32-1
-                seed = random.randint(0, 2**32 - 1)
+                # Generate random seed between 0 and 2^31-1
+                seed = random.randint(0, 2**31 - 1)
         except (ValueError, TypeError):
-            seed = random.randint(0, 2**32 - 1)
+            seed = random.randint(0, 2**31 - 1)
 
         # Update the data with the actual seed used
         data['seed'] = seed
