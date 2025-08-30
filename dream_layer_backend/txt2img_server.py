@@ -195,6 +195,10 @@ def handle_txt2img_batch():
                 )
                 registry.add_run(run_config)
                 
+                # Emit generated images immediately
+                for img_data in comfy_response.get("all_images", []):
+                    socketio.emit('image_generated', {'prompt': prompt, 'image_data': img_data, 'prompt_index': i + 1})
+                
                 # Emit completion for this prompt
                 socketio.emit('progress', {
                     'type': 'completed',

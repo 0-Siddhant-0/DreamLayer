@@ -290,6 +290,19 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
         }
       });
       
+      // Listen for real-time image generation
+      newSocket.on('image_generated', (data) => {
+        const newImage = {
+          id: `${Date.now()}-${Math.random()}`,
+          url: data.image_data.url,
+          prompt: data.prompt,
+          negativePrompt: coreSettings.negative_prompt,
+          timestamp: Date.now(),
+          settings: { ...coreSettings }
+        };
+        addImages([newImage]);
+      });
+      
       const requestData = {
         ...coreSettings,
         prompts,
@@ -310,18 +323,19 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
 
       const data = await response.json();
       
-      if (data.all_images?.length > 0) {
-        const images = data.all_images.map((img: any) => ({
-          id: `${Date.now()}-${Math.random()}`,
-          url: img.url,
-          prompt: img.prompt || "Batch generated",
-          negativePrompt: coreSettings.negative_prompt,
-          timestamp: Date.now(),
-          settings: { ...coreSettings }
-        }));
-        
-        addImages(images);
-      }
+      // Remove the batch completion image adding since images are now added in real-time
+      // if (data.all_images?.length > 0) {
+      //   const images = data.all_images.map((img: any) => ({
+      //     id: `${Date.now()}-${Math.random()}`,
+      //     url: img.url,
+      //     prompt: img.prompt || "Batch generated",
+      //     negativePrompt: coreSettings.negative_prompt,
+      //     timestamp: Date.now(),
+      //     settings: { ...coreSettings }
+      //   }));
+      //   
+      //   addImages(images);
+      // }
     } catch (error) {
       toast({
         title: "Batch failed",
