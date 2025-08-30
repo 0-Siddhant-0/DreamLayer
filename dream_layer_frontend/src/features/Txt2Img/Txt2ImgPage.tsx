@@ -12,6 +12,7 @@ import CheckpointBrowser from '@/components/checkpoint/CheckpointBrowser';
 import LoraBrowser from '@/components/lora/LoraBrowser';
 import CustomWorkflowBrowser from '@/components/custom-workflow/CustomWorkflowBrowser';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,9 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
   });
   const [customWorkflow, setCustomWorkflow] = useState<any | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<string>("");
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   const addImages = useTxt2ImgGalleryStore(state => state.addImages);
   const setLoading = useTxt2ImgGalleryStore(state => state.setLoading);
   const controlNetConfig = useControlNetStore(state => state.controlNetConfig);
@@ -250,6 +253,71 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
     }
   };
 
+  const handleBatchPrompts = async (prompts: string[]) => {
+    if (isGenerating) return;
+    
+    try {
+      setIsGenerating(true);
+      setLoading(true);
+      setBatchProgress(`Processing 0 of ${prompts.length} prompts...`);
+      
+      const requestData = {
+        ...coreSettings,
+        prompts,
+        custom_workflow: customWorkflow,
+        ...(controlNetConfig && { controlnet: controlNetConfig }),
+        ...(loraConfig?.enabled && { lora: loraConfig })
+      };
+      
+      const response = await fetch('http://localhost:5001/api/txt2img/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to process batch: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.failed_prompts?.length > 0) {
+        toast({
+          title: "Some prompts failed",
+          description: `${data.failed_prompts.length} prompts failed to generate`,
+          variant: "destructive"
+        });
+      }
+
+      if (data.all_images?.length > 0) {
+        const images = data.all_images.map((img: any) => ({
+          id: `${Date.now()}-${Math.random()}`,
+          url: img.url,
+          prompt: img.prompt || "Batch generated",
+          negativePrompt: coreSettings.negative_prompt,
+          timestamp: Date.now(),
+          settings: { ...coreSettings }
+        }));
+        
+        addImages(images);
+        toast({
+          title: "Batch complete",
+          description: `Generated ${data.processed_prompts} of ${data.total_prompts} images`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Batch failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+      setIsGenerating(false);
+      setBatchProgress("");
+    }
+  };
+
   const getAccordionTitle = () => {
     switch (activeSubTab) {
       case "checkpoints":
@@ -338,9 +406,14 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
               label="a) Prompt"
               maxLength={500}
               placeholder="Enter your prompt here"
+              showBatchPrompts={true}
               value={coreSettings.prompt}
               onChange={(value) => handlePromptChange(value)}
+              onBatchPrompts={handleBatchPrompts}
             />
+            {batchProgress && (
+              <div className="text-sm text-muted-foreground">{batchProgress}</div>
+            )}
             <PromptInput 
               label="b) Negative Prompt"
               negative={true}

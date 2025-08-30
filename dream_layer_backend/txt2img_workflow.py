@@ -17,6 +17,16 @@ from dream_layer_backend_utils.shared_workflow_parameters import (
 from shared_utils import SAMPLER_NAME_MAP
 
 
+def parse_prompts_from_file_content(file_content):
+    """Parse prompts from file content, skipping empty lines and comments"""
+    prompts = []
+    for line in file_content.split('\n'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            prompts.append(line)
+    return prompts
+
+
 def transform_to_txt2img_workflow(data):
     """
     Transform frontend data to ComfyUI txt2img workflow

@@ -136,6 +136,58 @@ def handle_txt2img():
             "message": str(e)
         }), 500
 
+@app.route('/api/txt2img/batch', methods=['POST'])
+def handle_txt2img_batch():
+    """Handle batch text-to-image generation from prompts array"""
+    try:
+        data = request.json
+        if not data or 'prompts' not in data:
+            return jsonify({"status": "error", "message": "No prompts provided"}), 400
+        
+        prompts = data['prompts']
+        all_generated_images = []
+        failed_prompts = []
+        
+        for i, prompt in enumerate(prompts):
+            try:
+                iteration_data = data.copy()
+                iteration_data['prompt'] = prompt
+                
+                workflow = transform_to_txt2img_workflow(iteration_data)
+                comfy_response = send_to_comfyui(workflow)
+                
+                if "error" in comfy_response:
+                    failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
+                    continue
+                
+                generated_images = []
+                if comfy_response.get("all_images"):
+                    for img_data in comfy_response["all_images"]:
+                        if isinstance(img_data, dict) and "filename" in img_data:
+                            generated_images.append(img_data["filename"])
+                    all_generated_images.extend(comfy_response["all_images"])
+                
+                from run_registry import registry
+                run_config = create_run_config_from_generation_data(
+                    iteration_data, generated_images, "txt2img"
+                )
+                registry.add_run(run_config)
+                
+            except Exception as e:
+                failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
+                continue
+        
+        return jsonify({
+            "status": "success",
+            "total_prompts": len(prompts),
+            "processed_prompts": len(prompts) - len(failed_prompts),
+            "failed_prompts": failed_prompts,
+            "all_images": all_generated_images
+        })
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/txt2img/interrupt', methods=['POST'])
 def handle_txt2img_interrupt():
     """Handle interruption of txt2img generation"""
