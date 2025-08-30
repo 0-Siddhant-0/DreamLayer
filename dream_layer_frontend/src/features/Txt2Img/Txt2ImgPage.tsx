@@ -22,6 +22,7 @@ import useControlNetStore from '@/stores/useControlNetStore';
 import { ControlNetRequest } from '@/types/controlnet';
 import useLoraStore from '@/stores/useLoraStore';
 import { LoraRequest } from '@/types/lora';
+import { io, Socket } from 'socket.io-client';
 
 interface Txt2ImgPageProps {
   selectedModel: string;
@@ -36,7 +37,9 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
   });
   const [customWorkflow, setCustomWorkflow] = useState<any | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<string>("");
+  const [batchPrompts, setBatchPrompts] = useState<string[]>([]);
+  const [progress, setProgress] = useState({ current: 0, total: 0, currentPrompt: '' });
+  const [socket, setSocket] = useState<Socket | null>(null);
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const addImages = useTxt2ImgGalleryStore(state => state.addImages);
@@ -259,7 +262,33 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
     try {
       setIsGenerating(true);
       setLoading(true);
-      setBatchProgress(`Processing 0 of ${prompts.length} prompts...`);
+      setProgress({ current: 0, total: prompts.length, currentPrompt: '' });
+      
+      // Connect to WebSocket
+      const newSocket = io('http://localhost:5001');
+      setSocket(newSocket);
+      
+      // Listen for progress updates
+      newSocket.on('progress', (data) => {
+        if (data.type === 'progress') {
+          setProgress({
+            current: data.current,
+            total: data.total,
+            currentPrompt: data.current_prompt
+          });
+        } else if (data.type === 'batch_complete') {
+          toast({
+            title: "Batch complete",
+            description: `Generated ${data.processed_prompts} of ${data.total_prompts} images`
+          });
+        } else if (data.type === 'error') {
+          toast({
+            title: "Prompt failed",
+            description: `Failed: ${data.current_prompt?.substring(0, 50)}...`,
+            variant: "destructive"
+          });
+        }
+      });
       
       const requestData = {
         ...coreSettings,
@@ -281,14 +310,6 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
 
       const data = await response.json();
       
-      if (data.failed_prompts?.length > 0) {
-        toast({
-          title: "Some prompts failed",
-          description: `${data.failed_prompts.length} prompts failed to generate`,
-          variant: "destructive"
-        });
-      }
-
       if (data.all_images?.length > 0) {
         const images = data.all_images.map((img: any) => ({
           id: `${Date.now()}-${Math.random()}`,
@@ -300,10 +321,6 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
         }));
         
         addImages(images);
-        toast({
-          title: "Batch complete",
-          description: `Generated ${data.processed_prompts} of ${data.total_prompts} images`
-        });
       }
     } catch (error) {
       toast({
@@ -314,7 +331,24 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
     } finally {
       setLoading(false);
       setIsGenerating(false);
-      setBatchProgress("");
+      setProgress({ current: 0, total: 0, currentPrompt: '' });
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+    }
+  };
+
+  const handleBatchPromptsLoaded = (prompts: string[]) => {
+    setBatchPrompts(prompts);
+  };
+
+  const handleGenerateWithBatch = () => {
+    if (batchPrompts.length > 0) {
+      handleBatchPrompts(batchPrompts);
+      setBatchPrompts([]); // Clear after starting generation
+    } else {
+      handleGenerateImage();
     }
   };
 
@@ -333,10 +367,10 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
     <div className="flex space-x-2">
       <Button 
         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        onClick={handleGenerateImage}
+        onClick={handleGenerateWithBatch}
         disabled={false}
       >
-        {isGenerating ? 'Interrupt' : 'Generate Image'}
+        {isGenerating ? 'Interrupt' : batchPrompts.length > 0 ? `Generate Batch (${batchPrompts.length})` : 'Generate Image'}
       </Button>
       {false && <button className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
         Save Settings
@@ -409,10 +443,18 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
               showBatchPrompts={true}
               value={coreSettings.prompt}
               onChange={(value) => handlePromptChange(value)}
-              onBatchPrompts={handleBatchPrompts}
+              onBatchPromptsLoaded={handleBatchPromptsLoaded}
             />
-            {batchProgress && (
-              <div className="text-sm text-muted-foreground">{batchProgress}</div>
+            {batchPrompts.length > 0 && (
+              <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                <strong>Batch loaded:</strong> {batchPrompts.length} prompts ready
+                <div className="text-xs mt-1">Preview: {batchPrompts.slice(0, 3).join(', ')}{batchPrompts.length > 3 ? '...' : ''}</div>
+              </div>
+            )}
+            {progress.total > 0 && (
+              <div className="text-sm text-muted-foreground bg-blue-50 p-2 rounded">
+                <strong>Processing {progress.current} of {progress.total}:</strong> {progress.currentPrompt}
+              </div>
             )}
             <PromptInput 
               label="b) Negative Prompt"

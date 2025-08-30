@@ -13,7 +13,7 @@ interface PromptInputProps {
   showBatchPrompts?: boolean;
   value: string;
   onChange: (value: string) => void;
-  onBatchPrompts?: (prompts: string[]) => void;
+  onBatchPromptsLoaded?: (prompts: string[]) => void;
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({
@@ -25,7 +25,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
   showBatchPrompts = false,
   value,
   onChange,
-  onBatchPrompts
+  onBatchPromptsLoaded
 }) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,9 +79,14 @@ const PromptInput: React.FC<PromptInputProps> = ({
         return;
       }
 
-      if (onBatchPrompts) {
-        onBatchPrompts(prompts);
+      if (onBatchPromptsLoaded) {
+        onBatchPromptsLoaded(prompts);
       }
+
+      toast({
+        title: "Prompts loaded",
+        description: `Loaded ${prompts.length} prompts. Click Generate to start batch processing.`
+      });
     } catch (error) {
       toast({
         title: "Error reading file",
@@ -117,7 +122,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
                 disabled={isProcessing}
                 className="text-xs rounded-md border border-input bg-background px-2 py-1 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
               >
-                {isProcessing ? "Processing..." : "Batch Prompts"}
+                {isProcessing ? "Loading..." : "Load Batch"}
               </button>
               <input
                 ref={fileInputRef}

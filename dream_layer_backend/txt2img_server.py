@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import json
 import os
 import requests
@@ -9,7 +10,7 @@ from shared_utils import  send_to_comfyui
 from dream_layer_backend_utils.fetch_advanced_models import get_controlnet_models
 from PIL import Image, ImageDraw
 from txt2img_workflow import transform_to_txt2img_workflow
-from run_registry import create_run_config_from_generation_data
+from run_registry import create_run_config_from_generation_data, registry
 from dataclasses import asdict
 
 app = Flask(__name__)
@@ -20,6 +21,7 @@ CORS(app, resources={
         "allow_headers": ["Content-Type"]
     }
 })
+socketio = SocketIO(app, cors_allowed_origins=["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:*", "http://127.0.0.1:*"])
 
 # Get served images directory
 output_dir, _ = get_directories()
@@ -97,7 +99,6 @@ def handle_txt2img():
                     print(f"Registering run for iteration {iteration + 1}")
                     # Register the completed run - each iteration gets unique run_id
                     try:
-                        from run_registry import registry
                         run_config = create_run_config_from_generation_data(
                             iteration_data, generated_images, "txt2img"
                         )
@@ -136,9 +137,15 @@ def handle_txt2img():
             "message": str(e)
         }), 500
 
+# WebSocket handlers
+@socketio.on('connect')
+def handle_connect():
+    print("Client connected to batch progress WebSocket")
+    emit('connected', {'status': 'connected'})
+
 @app.route('/api/txt2img/batch', methods=['POST'])
 def handle_txt2img_batch():
-    """Handle batch text-to-image generation from prompts array"""
+    """Handle batch text-to-image generation from prompts array with progress updates"""
     try:
         data = request.json
         if not data or 'prompts' not in data:
@@ -150,6 +157,15 @@ def handle_txt2img_batch():
         
         for i, prompt in enumerate(prompts):
             try:
+                # Emit progress update
+                socketio.emit('progress', {
+                    'type': 'progress',
+                    'current': i + 1,
+                    'total': len(prompts),
+                    'current_prompt': prompt,
+                    'status': 'processing'
+                })
+                
                 iteration_data = data.copy()
                 iteration_data['prompt'] = prompt
                 
@@ -158,6 +174,13 @@ def handle_txt2img_batch():
                 
                 if "error" in comfy_response:
                     failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
+                    socketio.emit('progress', {
+                        'type': 'error',
+                        'current': i + 1,
+                        'total': len(prompts),
+                        'current_prompt': prompt,
+                        'status': 'failed'
+                    })
                     continue
                 
                 generated_images = []
@@ -167,15 +190,39 @@ def handle_txt2img_batch():
                             generated_images.append(img_data["filename"])
                     all_generated_images.extend(comfy_response["all_images"])
                 
-                from run_registry import registry
                 run_config = create_run_config_from_generation_data(
                     iteration_data, generated_images, "txt2img"
                 )
                 registry.add_run(run_config)
                 
+                # Emit completion for this prompt
+                socketio.emit('progress', {
+                    'type': 'completed',
+                    'current': i + 1,
+                    'total': len(prompts),
+                    'current_prompt': prompt,
+                    'status': 'completed'
+                })
+                
             except Exception as e:
                 failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
+                socketio.emit('progress', {
+                    'type': 'error',
+                    'current': i + 1,
+                    'total': len(prompts),
+                    'current_prompt': prompt,
+                    'status': 'failed'
+                })
                 continue
+        
+        # Emit batch completion
+        socketio.emit('progress', {
+            'type': 'batch_complete',
+            'total_prompts': len(prompts),
+            'processed_prompts': len(prompts) - len(failed_prompts),
+            'failed_prompts': len(failed_prompts),
+            'status': 'complete'
+        })
         
         return jsonify({
             "status": "success",
@@ -186,6 +233,11 @@ def handle_txt2img_batch():
         })
         
     except Exception as e:
+        socketio.emit('progress', {
+            'type': 'error',
+            'status': 'batch_failed',
+            'message': str(e)
+        })
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/txt2img/interrupt', methods=['POST'])
@@ -273,10 +325,11 @@ def upload_controlnet_image_endpoint():
         }), 500
 
 if __name__ == "__main__":
-    print("\nStarting Text2Image Handler Server...")
+    print("\nStarting Text2Image Handler Server with WebSocket support...")
     print("Listening for requests at http://localhost:5001/api/txt2img")
+    print("WebSocket available at ws://localhost:5001")
     print("ControlNet endpoints available:")
     print("  - GET /api/controlnet/models")
     print("  - POST /api/upload-controlnet-image")
     print("  - GET /api/images/<filename>")
-    app.run(host='127.0.0.1', port=5001, debug=True) 
+    socketio.run(app, host='127.0.0.1', port=5001, debug=True, allow_unsafe_werkzeug=True) 
