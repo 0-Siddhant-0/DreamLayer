@@ -81,7 +81,7 @@ start_python_server() {
     
     # Start the server in background
     cd dream_layer_backend
-    python "$server_file" > "../$log_file" 2>&1 &
+    $PYTHON_PATH "$server_file" > "../$log_file" 2>&1 &
     local pid=$!
     cd ..
     
@@ -148,11 +148,44 @@ main() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR"
     
-    # Check if Python is available
-    if ! command -v python &> /dev/null; then
-        print_error "Python is not installed or not in PATH"
+    # Find the best available Python version (prefer 3.11, but allow 3.8-3.11)
+    PYTHON_PATH=""
+    
+    # Try Python versions in order of preference (3.11 first, then down to 3.8)
+    for version in "3.11" "3.10" "3.9" "3.8"; do
+        # Check Homebrew locations first
+        if [ -f "/opt/homebrew/bin/python${version}" ]; then
+            PYTHON_PATH="/opt/homebrew/bin/python${version}"
+            break
+        elif [ -f "/usr/local/bin/python${version}" ]; then
+            PYTHON_PATH="/usr/local/bin/python${version}"
+            break
+        elif command -v "python${version}" &> /dev/null; then
+            PYTHON_PATH="python${version}"
+            break
+        fi
+    done
+    
+    # Fallback to generic python3 if specific versions not found
+    if [ -z "$PYTHON_PATH" ] && command -v python3 &> /dev/null; then
+        PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+        if [ "$(echo "$PYTHON_VERSION" | cut -d'.' -f1)" = "3" ]; then
+            local minor_version=$(echo "$PYTHON_VERSION" | cut -d'.' -f2)
+            if [ "$minor_version" -ge 8 ] && [ "$minor_version" -le 11 ]; then
+                PYTHON_PATH="python3"
+            fi
+        fi
+    fi
+    
+    if [ -z "$PYTHON_PATH" ]; then
+        print_error "No compatible Python version found (need Python 3.8-3.11)"
+        print_error "Please run ./install_mac_dependencies.sh first"
         exit 1
     fi
+    
+    # Get and display the actual version
+    ACTUAL_VERSION=$($PYTHON_PATH --version 2>&1 | cut -d' ' -f2)
+    print_status "Using Python: $PYTHON_PATH (version $ACTUAL_VERSION)"
     
     # Check if Node.js is available
     if ! command -v node &> /dev/null; then

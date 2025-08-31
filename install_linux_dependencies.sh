@@ -271,6 +271,7 @@ install_python_dependencies() {
     # Install backend dependencies
     if [ -f "dream_layer_backend/requirements.txt" ]; then
         print_step "Installing Dream Layer backend dependencies..."
+        pip install --upgrade pip setuptools wheel
         python3 -m pip install -r dream_layer_backend/requirements.txt
         print_success "Backend dependencies installed"
     else
@@ -281,10 +282,6 @@ install_python_dependencies() {
     if [ -f "ComfyUI/requirements.txt" ]; then
         print_step "Installing ComfyUI dependencies..."
         python3 -m pip install -r ComfyUI/requirements.txt
-        
-        # Install missing dependency for custom nodes
-        pip install lpips
-        
         print_success "ComfyUI dependencies installed"
     else
         print_warning "ComfyUI/requirements.txt not found"
