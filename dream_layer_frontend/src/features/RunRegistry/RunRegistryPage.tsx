@@ -117,7 +117,7 @@ const RunRegistryPage: React.FC = () => {
                       {run.run_id.slice(0, 8)}...
                     </Badge>
                     <Badge className={getGenerationTypeColor(run.generation_type)}>
-                      {run.generation_type.toUpperCase()}
+                      {(run.generation_type || '').toUpperCase()}
                     </Badge>
                   </div>
                   <div className="flex items-center space-x-2">

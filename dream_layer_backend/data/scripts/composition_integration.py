@@ -21,14 +21,22 @@ import yaml
 from queries import DreamLayerQueries
 
 # Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('punkt', quiet=True)
-    nltk.download('averaged_perceptron_tagger', quiet=True)
-    nltk.download('wordnet', quiet=True)
+required_nltk_data = [
+    ('tokenizers/punkt', 'punkt'),
+    ('tokenizers/punkt_tab', 'punkt_tab'),
+    ('taggers/averaged_perceptron_tagger', 'averaged_perceptron_tagger'),
+    ('taggers/averaged_perceptron_tagger_eng', 'averaged_perceptron_tagger_eng'),
+    ('corpora/wordnet', 'wordnet')
+]
+
+for resource_path, download_name in required_nltk_data:
+    try:
+        nltk.data.find(resource_path)
+    except LookupError:
+        try:
+            nltk.download(download_name, quiet=True)
+        except Exception as e:
+            logger.warning(f"Failed to download NLTK resource {download_name}: {e}")
 
 from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
@@ -82,7 +90,7 @@ class CompositionMetricsCalculator:
             raise
     
     def _load_model(self):
-        """Lazy load YOLO model with shared instance"""
+        """Lazy load YOLO model with shared instance and automatic download to scripts folder"""
         if CompositionMetricsCalculator._shared_model_loaded:
             self.model = CompositionMetricsCalculator._shared_model
             self._model_loaded = True
@@ -90,17 +98,41 @@ class CompositionMetricsCalculator:
         
         try:
             model_name = self.config["yolo"]["model"]
+            
+            # Define the model path in the scripts folder
+            scripts_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(scripts_dir, model_name)
+            
             logger.info(f"Loading YOLO model: {model_name}")
-            CompositionMetricsCalculator._shared_model = YOLO(model_name)
+            logger.info(f"Model path: {model_path}")
+            
+            # Check if model file exists in scripts folder
+            if os.path.exists(model_path):
+                logger.info(f"Model file found at {model_path}")
+                # Load from existing file
+                CompositionMetricsCalculator._shared_model = YOLO(model_path)
+            else:
+                logger.info(f"Model file {model_name} not found in scripts folder. Downloading to {model_path}...")
+                # Download to scripts folder by temporarily changing working directory
+                original_cwd = os.getcwd()
+                try:
+                    os.chdir(scripts_dir)
+                    CompositionMetricsCalculator._shared_model = YOLO(model_name)
+                    logger.info(f"YOLO model {model_name} downloaded to {scripts_dir}")
+                finally:
+                    os.chdir(original_cwd)
+            
             CompositionMetricsCalculator._shared_model_loaded = True
             
             # Update instance references
             self.model = CompositionMetricsCalculator._shared_model
             self._model_loaded = True
             
-            logger.info("YOLO model loaded successfully")
+            logger.info(f"YOLO model {model_name} loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to load YOLO model: {e}")
+            logger.error(f"Failed to load YOLO model {model_name}: {e}")
+            logger.error("This could be due to network connectivity issues during model download.")
+            logger.error("Please ensure you have internet access for the initial model download.")
             CompositionMetricsCalculator._shared_model = None
             CompositionMetricsCalculator._shared_model_loaded = False
             self.model = None

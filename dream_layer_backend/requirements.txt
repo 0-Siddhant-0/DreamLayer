@@ -20,3 +20,7 @@ transformers>=4.30.0
 open-clip-torch>=2.20.0
 # Additional image processing
 opencv-python>=4.8.0
+# Natural language processing
+nltk>=3.8
+# Image quality metrics (FID support)
+torchmetrics[image]>=1.0.0

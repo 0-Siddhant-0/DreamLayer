@@ -182,7 +182,7 @@ const ReportBundlePage: React.FC = () => {
                           {run.run_id.slice(0, 8)}...
                         </Badge>
                         <Badge className={getGenerationTypeColor(run.generation_type)}>
-                          {run.generation_type.toUpperCase()}
+                          {(run.generation_type || '').toUpperCase()}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
                           {formatTimestamp(run.timestamp)}

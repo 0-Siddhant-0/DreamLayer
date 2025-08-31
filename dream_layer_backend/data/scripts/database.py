@@ -48,6 +48,8 @@ class DreamLayerDB:
             self.create_schema()
         else:
             logger.info(f"Using existing database at {self.db_path}")
+            # Check and create any missing tables
+            self.ensure_all_tables_exist()
     
     def create_schema(self):
         """Create all database tables with proper schema"""
@@ -73,7 +75,8 @@ class DreamLayerDB:
                     batch_count INTEGER,
                     workflow TEXT,
                     version TEXT,
-                    generation_type TEXT
+                    generation_type TEXT,
+                    generated_images TEXT
                 )
             """)
             
@@ -122,6 +125,62 @@ class DreamLayerDB:
             
             conn.commit()
             logger.info("Database schema created successfully")
+    
+    def ensure_all_tables_exist(self):
+        """Check for missing tables and create them automatically"""
+        with self.get_connection() as conn:
+            # Check if composition_metrics table exists
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='composition_metrics'
+            """)
+            
+            if not cursor.fetchone():
+                logger.info("Creating missing composition_metrics table")
+                self.create_composition_metrics_table()
+            
+            # Add more table checks here as needed in the future
+            # Example: if not self.table_exists('future_table'): self.create_future_table()
+    
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in the database"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+            """, (table_name,))
+            return cursor.fetchone() is not None
+    
+    def create_composition_metrics_table(self):
+        """Create the composition_metrics table"""
+        with self.get_connection() as conn:
+            # Create composition_metrics table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS composition_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    prompt_text TEXT,
+                    image_path TEXT,
+                    macro_precision REAL,
+                    macro_recall REAL,
+                    macro_f1 REAL,
+                    per_class_metrics TEXT,
+                    detected_objects TEXT,
+                    missing_objects TEXT,
+                    timestamp TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+                )
+            """)
+            
+            # Create indexes for composition_metrics table
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_composition_metrics_run_id ON composition_metrics(run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_composition_metrics_timestamp ON composition_metrics(timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_composition_metrics_f1 ON composition_metrics(macro_f1)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_composition_metrics_precision ON composition_metrics(macro_precision)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_composition_metrics_recall ON composition_metrics(macro_recall)")
+            
+            conn.commit()
+            logger.info("composition_metrics table created successfully")
     
     def insert_run(self, run_data: Dict[str, Any]) -> bool:
         """Insert a single run into the database"""
