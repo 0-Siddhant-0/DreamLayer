@@ -542,9 +542,13 @@ class LabeledGridExporter:
             max_images = grid_size[0] * grid_size[1]
             loaded_images = loaded_images[:max_images]
         
-        # Use frontend grid_size directly - no grid calculation
-        actual_grid_size = grid_size if grid_size is not None else (2, 2)  # default fallback
-        logger.info(f"Using grid size: {actual_grid_size}")
+        # Use frontend grid_size directly, or calculate optimal size for auto layout
+        if grid_size is not None:
+            actual_grid_size = grid_size
+            logger.info(f"Using explicit grid size: {actual_grid_size}")
+        else:
+            actual_grid_size = self.layout_manager.calculate_grid_size(len(loaded_images), None)
+            logger.info(f"Calculated optimal grid size: {actual_grid_size}")
         
         dimensions = self.layout_manager.calculate_dimensions(loaded_images, actual_grid_size)
         
