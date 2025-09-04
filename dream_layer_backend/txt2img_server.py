@@ -4,6 +4,8 @@ from flask_socketio import SocketIO, emit
 import json
 import os
 import requests
+import time
+import shutil
 from dream_layer import get_directories
 from dream_layer_backend_utils import interrupt_workflow
 from shared_utils import  send_to_comfyui
@@ -243,6 +245,80 @@ def handle_txt2img_batch():
             'message': str(e)
         })
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/txt2img/create-grid', methods=['POST'])
+def create_txt2img_grid():
+    """Create grids from recent txt2img generations based on batch settings"""
+    try:
+        data = request.get_json()
+        batch_size = data.get('batch_size', 4)
+        batch_count = data.get('batch_count', 1)
+        
+        print(f"[API] Creating grids for {batch_count} batches of {batch_size} images each")
+        
+        # Get recent images
+        from grid_exporter import LabeledGridExporter
+        exporter = LabeledGridExporter()
+        
+        total_images_needed = batch_size * batch_count
+        recent_images = exporter.get_recent_images(total_images_needed)
+        
+        if len(recent_images) < total_images_needed:
+            return jsonify({
+                "status": "error",
+                "message": f"Not enough recent images. Found {len(recent_images)}, needed {total_images_needed}"
+            }), 400
+        
+        grids = []
+        
+        # Create one grid per batch
+        for batch_idx in range(batch_count):
+            start_idx = batch_idx * batch_size
+            end_idx = start_idx + batch_size
+            batch_images = recent_images[start_idx:end_idx]
+            
+            # Auto-calculate grid size based on batch_size
+            grid_size = exporter.layout_manager.calculate_grid_size(batch_size, None)
+            
+            # Create grid for this batch
+            timestamp = int(time.time())
+            filename = f"txt2img_batch_{batch_idx + 1}_{timestamp}.png"
+            
+            grid_path = exporter.export_grid(
+                batch_images,
+                filename,
+                grid_size,
+                show_labels=True,
+                show_filenames=False
+            )
+            
+            # Copy to served directory for frontend access
+            served_filename = f"txt2img_grid_{timestamp}_{batch_idx}.png"
+            served_path = os.path.join(SERVED_IMAGES_DIR, served_filename)
+            shutil.copy2(grid_path, served_path)
+            
+            grids.append({
+                'url': f"http://localhost:5001/api/images/{served_filename}",
+                'batch_size': batch_size,
+                'batch_index': batch_idx + 1,
+                'grid_layout': f"{grid_size[0]}x{grid_size[1]}",
+                'timestamp': timestamp
+            })
+            
+            print(f"[API] Created grid {batch_idx + 1}/{batch_count}: {grid_size[0]}x{grid_size[1]} layout")
+        
+        return jsonify({
+            'status': 'success',
+            'grids': grids,
+            'message': f'Created {len(grids)} grids successfully'
+        })
+        
+    except Exception as e:
+        print(f"[API] Error creating txt2img grids: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/api/txt2img/interrupt', methods=['POST'])
 def handle_txt2img_interrupt():

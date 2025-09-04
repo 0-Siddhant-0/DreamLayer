@@ -40,6 +40,8 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
   const [batchPrompts, setBatchPrompts] = useState<string[]>([]);
   const [progress, setProgress] = useState({ current: 0, total: 0, currentPrompt: '' });
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [grids, setGrids] = useState<any[]>([]);
+  const [isCreatingGrid, setIsCreatingGrid] = useState(false);
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const addImages = useTxt2ImgGalleryStore(state => state.addImages);
@@ -366,6 +368,42 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
     }
   };
 
+  const handleCreateGrid = async () => {
+    setIsCreatingGrid(true);
+    try {
+      const response = await fetch('http://localhost:5001/api/txt2img/create-grid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batch_size: coreSettings.batch_size,
+          batch_count: coreSettings.batch_count
+        })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setGrids(prev => [...prev, ...result.grids]);
+        toast({
+          title: "Success",
+          description: `Created ${result.grids.length} grids successfully!`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || 'Failed to create grids',
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: 'Failed to create grids',
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingGrid(false);
+    }
+  };
+
   const getAccordionTitle = () => {
     switch (activeSubTab) {
       case "checkpoints":
@@ -386,6 +424,14 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
       >
         {isGenerating ? 'Interrupt' : batchPrompts.length > 0 ? `Generate Batch (${batchPrompts.length})` : 'Generate Image'}
       </Button>
+      <Button 
+        onClick={handleCreateGrid}
+        disabled={isCreatingGrid}
+        variant="outline"
+        className="whitespace-nowrap"
+      >
+        {isCreatingGrid ? 'Creating Grids...' : 'Create Grid'}
+      </Button>
       {false && <button className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
         Save Settings
       </button>}
@@ -394,7 +440,7 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
 
   const MobileImagePreview = () => (
     <div className="my-4 w-full">
-      <ImagePreview onTabChange={onTabChange} />
+      <ImagePreview onTabChange={onTabChange} grids={grids} />
     </div>
   );
 
@@ -594,7 +640,7 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
       {/* Right Column - Preview */}
       {!isMobile && (
         <div>
-          <ImagePreview onTabChange={onTabChange} />
+          <ImagePreview onTabChange={onTabChange} grids={grids} />
         </div>
       )}
     </div>
