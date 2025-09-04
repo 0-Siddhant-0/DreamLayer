@@ -104,7 +104,8 @@ class MetadataExtractor:
             'steps': steps[index % len(steps)],
             'cfg': cfg_scales[index % len(cfg_scales)],
             'preset': presets[index % len(presets)],
-            'seed': seeds[index % len(seeds)]
+            'seed': seeds[index % len(seeds)],
+            'filename': image_filename
         }
     
     def _parse_actual_logs(self, image_filename: str, image_timestamp: float) -> Dict[str, str]:
@@ -282,7 +283,8 @@ class GridRenderer:
     
     def render_cell(self, canvas: Image.Image, draw: ImageDraw.Draw, 
                    image: Image.Image, metadata: Dict[str, str], 
-                   position: Tuple[int, int], dimensions: Dict[str, int]) -> None:
+                   position: Tuple[int, int], dimensions: Dict[str, int],
+                   show_labels: bool = True, show_filenames: bool = False) -> None:
         """
         Render a single cell (image + labels) onto the canvas.
         
@@ -307,10 +309,12 @@ class GridRenderer:
         # Paste the actual image
         canvas.paste(image, (x, y))
         
-        # Draw labels below image
-        self._draw_labels(draw, metadata, x, y + image.height + 8)
+        # Draw labels below image only if show_labels is True
+        if show_labels:
+            self._draw_labels(draw, metadata, x, y + image.height + 8, show_filenames)
     
-    def _draw_labels(self, draw: ImageDraw.Draw, metadata: Dict[str, str], x: int, y: int) -> None:
+    def _draw_labels(self, draw: ImageDraw.Draw, metadata: Dict[str, str], 
+                    x: int, y: int, show_filenames: bool = False) -> None:
         """
         Draw metadata labels at the specified position.
         
@@ -327,6 +331,10 @@ class GridRenderer:
             f"Preset: {metadata.get('preset', 'Unknown')}",
             f"Seed: {metadata.get('seed', 'Unknown')}"
         ]
+        
+        # Add filename to labels if show_filenames is True
+        if show_filenames:
+            labels.append(f"File: {metadata.get('filename', 'Unknown')}")
         
         line_height = 22
         for i, label_text in enumerate(labels):
@@ -364,11 +372,14 @@ class LabeledGridExporter:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         
-        # Set up main output directory
+        # Set up grid output directory (separate from generated images)
         if output_dir is None:
-            self.output_dir = os.path.join(project_root, "Dream_Layer_Resources", "output")
+            self.grid_dir = os.path.join(project_root, "Dream_Layer_Resources", "grids")
         else:
-            self.output_dir = output_dir
+            self.grid_dir = output_dir
+        
+        # Set up source directory for finding recent images (original output directory)
+        self.source_images_dir = os.path.join(project_root, "Dream_Layer_Resources", "output")
         
         # Set up served images directory (where DreamLayer API stores images)
         self.served_images_dir = os.path.join(current_dir, "served_images")
@@ -384,7 +395,8 @@ class LabeledGridExporter:
         self.layout_manager = GridLayoutManager()
         self.renderer = GridRenderer(self.font)
         
-        logger.info(f"Main output directory: {self.output_dir}")
+        logger.info(f"Grid output directory: {self.grid_dir}")
+        logger.info(f"Source images directory: {self.source_images_dir}")
         logger.info(f"Served images directory: {self.served_images_dir}")
         logger.info(f"Logs directory: {self.logs_dir}")
         logger.info(f"Font initialized: {type(self.font).__name__}")
@@ -438,10 +450,9 @@ class LabeledGridExporter:
         """
         images = []
         
-        # Check both output directories
+        # Check source images directory only (exclude served_images to prevent grid contamination)
         directories_to_check = [
-            self.output_dir,
-            self.served_images_dir
+            self.source_images_dir
         ]
         
         for directory in directories_to_check:
@@ -479,7 +490,9 @@ class LabeledGridExporter:
     
     def create_labeled_grid(self, 
                            images: List[Dict[str, Any]], 
-                           grid_size: Optional[Tuple[int, int]] = None) -> Image.Image:
+                           grid_size: Optional[Tuple[int, int]] = None,
+                           show_labels: bool = True,
+                           show_filenames: bool = False) -> Image.Image:
         """
         Create a labeled grid from image data using the component architecture.
         
@@ -505,19 +518,34 @@ class LabeledGridExporter:
                         im = im.convert('RGB')
                     pil_img = im.copy()  # detach from file handle (important on Windows)
                 
+                # Resize to standard size for consistent grid dimensions
+                standard_size = (512, 512)
+                pil_img = pil_img.resize(standard_size, Image.Resampling.LANCZOS)
+                
                 # Extract metadata for this image
                 metadata = self.metadata_extractor.extract_metadata(img_info['filename'], img_info['mtime'])
                 
                 loaded_images.append((pil_img, metadata))
-                logger.debug(f"Loaded: {img_info['filename']} ({pil_img.width}x{pil_img.height})")
+                logger.debug(f"Loaded: {img_info['filename']} (resized to {pil_img.width}x{pil_img.height})")
             except Exception as e:
                 logger.error(f"Could not load image {img_info['filepath']}: {e}")
         
         if not loaded_images:
             raise ValueError("No images could be loaded")
         
-        # Calculate grid layout using layout manager
-        actual_grid_size = self.layout_manager.calculate_grid_size(len(loaded_images), grid_size)
+        # Log which images are being used for grid generation
+        image_names = [metadata.get('filename', 'Unknown') for _, metadata in loaded_images]
+        logger.info(f"Images used for grid: {image_names}")
+        
+        # If grid_size is specified, limit images to fit the grid
+        if grid_size is not None:
+            max_images = grid_size[0] * grid_size[1]
+            loaded_images = loaded_images[:max_images]
+        
+        # Use frontend grid_size directly - no grid calculation
+        actual_grid_size = grid_size if grid_size is not None else (2, 2)  # default fallback
+        logger.info(f"Using grid size: {actual_grid_size}")
+        
         dimensions = self.layout_manager.calculate_dimensions(loaded_images, actual_grid_size)
         
         logger.info(f"Creating {dimensions['cols']}x{dimensions['rows']} grid for {len(loaded_images)} images")
@@ -533,7 +561,7 @@ class LabeledGridExporter:
             position = self.layout_manager.get_cell_position(idx, dimensions)
             logger.debug(f"Placing image {idx} at position {position}")
             
-            self.renderer.render_cell(canvas, draw, img, metadata, position, dimensions)
+            self.renderer.render_cell(canvas, draw, img, metadata, position, dimensions, show_labels, show_filenames)
         
         logger.info("Grid assembly completed")
         return canvas
@@ -541,7 +569,9 @@ class LabeledGridExporter:
     def export_grid(self, 
                    images: List[Dict[str, Any]], 
                    filename: Optional[str] = None,
-                   grid_size: Optional[Tuple[int, int]] = None) -> str:
+                   grid_size: Optional[Tuple[int, int]] = None,
+                   show_labels: bool = True,
+                   show_filenames: bool = False) -> str:
         """
         Export a labeled grid to PNG file with metadata.
         
@@ -559,6 +589,11 @@ class LabeledGridExporter:
         if filename is None:
             timestamp = int(time.time())
             filename = f"labeled_grid_{timestamp}.png"
+        else:
+            # Always append timestamp to prevent overwriting
+            timestamp = int(time.time())
+            name, ext = os.path.splitext(filename)
+            filename = f"{name}_{timestamp}{ext}"
         
         # Ensure filename ends with .png
         if not filename.lower().endswith('.png'):
@@ -567,11 +602,11 @@ class LabeledGridExporter:
         logger.info("Creating labeled grid...")
         
         # Create the grid
-        grid_image = self.create_labeled_grid(images, grid_size)
+        grid_image = self.create_labeled_grid(images, grid_size, show_labels, show_filenames)
         
-        # Save to output directory
-        os.makedirs(self.output_dir, exist_ok=True)
-        output_path = os.path.join(self.output_dir, filename)
+        # Save to grid directory
+        os.makedirs(self.grid_dir, exist_ok=True)
+        output_path = os.path.join(self.grid_dir, filename)
         
         # Save with metadata
         grid_image.save(output_path, format='PNG', optimize=True)
@@ -585,7 +620,9 @@ class LabeledGridExporter:
     def create_grid_from_recent(self, 
                                count: int = 8, 
                                grid_size: Optional[Tuple[int, int]] = None,
-                               filename: Optional[str] = None) -> str:
+                               filename: Optional[str] = None,
+                               show_labels: bool = True,
+                               show_filenames: bool = False) -> str:
         """
         Convenience method to create grid from most recent images.
         
@@ -617,7 +654,7 @@ class LabeledGridExporter:
             logger.debug(f"  {i+1}. {img['filename']}")
         
         # Export the grid
-        return self.export_grid(recent_images, filename, grid_size)
+        return self.export_grid(recent_images, filename, grid_size, show_labels, show_filenames)
 
 
 def main():

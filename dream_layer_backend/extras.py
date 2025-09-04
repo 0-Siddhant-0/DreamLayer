@@ -355,7 +355,9 @@ def create_grid():
         output_path = exporter.create_grid_from_recent(
             count=count,
             grid_size=grid_size,
-            filename=filename
+            filename=filename,
+            show_labels=show_labels,
+            show_filenames=show_filenames
         )
 
         # Copy to served images directory for frontend access
