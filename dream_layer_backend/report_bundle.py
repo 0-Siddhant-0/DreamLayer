@@ -85,7 +85,7 @@ class ReportBundleGenerator:
         columns = [
             'run_id', 'timestamp', 'model', 'prompt', 'negative_prompt',
             'seed', 'steps', 'cfg_scale', 'width', 'height',
-            'image_count', 'clip_score_mean', 'fid_score', 'macro_precision', 'macro_recall', 'macro_f1'
+            'image_count', 'filenames', 'clip_score_mean', 'fid_score', 'macro_precision', 'macro_recall', 'macro_f1'
         ]
         
         # Write CSV
@@ -99,6 +99,9 @@ class ReportBundleGenerator:
                     if col == 'image_count':
                         images = run.get('generated_images', [])
                         csv_row[col] = len(images) if images else 0
+                    elif col == 'filenames':
+                        images = run.get('generated_images', [])
+                        csv_row[col] = '; '.join(images) if images else ''
                     else:
                         csv_row[col] = run.get(col, '')
                 
