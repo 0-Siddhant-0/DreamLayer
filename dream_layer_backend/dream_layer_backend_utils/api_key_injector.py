@@ -66,6 +66,7 @@ ENV_KEY_TO_EXTRA_DATA_MAPPING = {
     "COMFY_AUTH_TOKEN": "auth_token_comfy_org",
     "GEMINI_API_KEY": "api_key_comfy_org",
     "LUMA_API_KEY": "luma_api_key",  # Direct API key for Luma
+    "RUNWAY_API_KEY": "api_key_comfy_org",
     # Future additions:
     # "ANTHROPIC_API_KEY": "api_key_anthropic",
 }
