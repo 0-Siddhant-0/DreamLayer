@@ -555,7 +555,7 @@ const Txt2ImgPage: React.FC<Txt2ImgPageProps> = ({ selectedModel, onTabChange })
               <div className="flex space-x-2">
                 <button 
                   className="text-xs rounded-md border border-input bg-background px-2 py-1 hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => handleSeedChange(-1, true)}
+                  onClick={() => handleSeedChange(Math.floor(Math.random() * 1073741824), false)}
                 >
                   Randomize Seed
                 </button>
