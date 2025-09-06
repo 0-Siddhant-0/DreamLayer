@@ -45,6 +45,7 @@ NODE_TO_API_KEY_MAPPING = {
     # Gemini Nodes
     "GeminiNode": "GEMINI_API_KEY",
     "GeminiInputFiles": "GEMINI_API_KEY",
+    "BananaImageNode": "GEMINI_API_KEY",
     
     # Luma Image Node (direct API)
     "LumaImageNode": "LUMA_API_KEY",
@@ -152,7 +153,7 @@ def inject_api_keys_into_workflow(workflow: Dict[str, Any], all_api_keys: Dict[s
     print(f"[DEBUG] all_api_keys keys: {all_api_keys.keys()}")
     if needed_env_keys:
         # If we have multiple keys that map to api_key_comfy_org, choose one
-        # Priority: BFL_API_KEY first, then OPENAI_API_KEY, then IDEOGRAM_API_KEY
+        # Priority: BFL_API_KEY first, then OPENAI_API_KEY, then IDEOGRAM_API_KEY, then GEMINI_API_KEY
         if "BFL_API_KEY" in needed_env_keys and "BFL_API_KEY" in all_api_keys:
             api_key_comfy_org = all_api_keys["BFL_API_KEY"]
             print(f"[DEBUG] Using BFL_API_KEY for api_key_comfy_org")
@@ -162,6 +163,9 @@ def inject_api_keys_into_workflow(workflow: Dict[str, Any], all_api_keys: Dict[s
         elif "IDEOGRAM_API_KEY" in needed_env_keys and "IDEOGRAM_API_KEY" in all_api_keys:
             api_key_comfy_org = all_api_keys["IDEOGRAM_API_KEY"]
             print(f"[DEBUG] Using IDEOGRAM_API_KEY for api_key_comfy_org")
+        elif "GEMINI_API_KEY" in needed_env_keys and "GEMINI_API_KEY" in all_api_keys:
+            api_key_comfy_org = all_api_keys["GEMINI_API_KEY"]
+            print(f"[DEBUG] Using GEMINI_API_KEY for api_key_comfy_org")
         else:
             print(
                 f"[DEBUG] No available API keys for needed services: {needed_env_keys}")

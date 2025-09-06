@@ -31,3 +31,4 @@ comfyui-embedded-docs
 
 # Missing essential dependencies for custom nodes
 lpips>=0.1.4
+google-generativeai>=0.8.0
