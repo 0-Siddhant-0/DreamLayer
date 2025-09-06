@@ -654,7 +654,7 @@ class RunwayText2ImgNode(ComfyNodeABC):
     API_NODE = True
     DESCRIPTION = "Generate an image from a text prompt using Runway's API directly."
 
-    MAX_POLL_ATTEMPTS = 30
+    MAX_POLL_ATTEMPTS = 60
 
     @classmethod
     def INPUT_TYPES(s):

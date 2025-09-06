@@ -1587,14 +1587,23 @@ class SaveImage:
             elif image.ndim != 3:
                 raise ValueError(f"Unexpected image shape: {image.shape}")
 
-            img_np = image.permute(1, 2, 0).cpu().numpy()  # [H, W, C]
+            # Handle different channel orderings: [C, H, W] vs [H, C, W] vs [H, W, C]
+            if image.shape[0] in [3, 4]:  # [C, H, W] format
+                img_np = image.permute(1, 2, 0).cpu().numpy()  # [H, W, C]
+            elif image.shape[1] in [3, 4]:  # [H, C, W] format  
+                img_np = image.permute(0, 2, 1).cpu().numpy()  # [H, W, C]
+            else:  # [H, W, C] format (already correct)
+                img_np = image.cpu().numpy()
             if img_np.max() <= 1.0:
                img_np = (img_np * 255).astype(np.uint8)
             else:
                img_np = np.clip(img_np, 0, 255).astype(np.uint8)
  
-            if img_np.shape[2] != 3:
-               raise ValueError(f"Image must have 3 channels, got shape: {img_np.shape}")
+            # Convert RGBA to RGB if needed for saving
+            if img_np.shape[2] == 4:
+                img_np = img_np[:, :, :3]  # Drop alpha channel
+            elif img_np.shape[2] != 3:
+                raise ValueError(f"Image must have 3 channels, got shape: {img_np.shape}")
 
             img = Image.fromarray(img_np)
             metadata = None
