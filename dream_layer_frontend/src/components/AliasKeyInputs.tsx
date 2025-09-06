@@ -58,12 +58,6 @@ const ApiKeysForm: React.FC = () => {
   const [showText, setShowText] = useState<boolean[]>(
     Array(fields.length).fill(false)
   );
-=======
-  const [keys, setKeys] = useState<string[]>(["", "", "", ""]);
-  const [submitted, setSubmitted] = useState<boolean[]>([false, false, false, false]);
-  const [loading, setLoading] = useState<boolean[]>([false, false, false, false]);
-  const [showText, setShowText] = useState<boolean[]>([false, false, false, false]);
->>>>>>> 8a5a2af (Runway txt2img generation has been done)
 
   const handleChange = (index: number, value: string) => {
     setKeys((prev) => {
