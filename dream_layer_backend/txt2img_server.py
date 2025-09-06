@@ -14,6 +14,70 @@ from PIL import Image, ImageDraw
 from txt2img_workflow import transform_to_txt2img_workflow
 from run_registry import create_run_config_from_generation_data, registry
 from dataclasses import asdict
+import base64
+import google.generativeai as genai
+
+def call_banana_api_directly(data):
+    """Call Gemini API directly for banana models, bypassing ComfyUI"""
+    try:
+        # Configure Gemini with API key
+        from dream_layer_backend_utils.api_key_injector import read_api_keys_from_env
+        api_keys = read_api_keys_from_env()
+        gemini_key = api_keys.get('GEMINI_API_KEY')
+        if not gemini_key:
+            raise Exception("No Gemini API key found")
+        
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-2.5-flash-image-preview')
+        
+        # Extract parameters from UI data
+        prompt = data.get('prompt', 'beautiful image')
+        
+        # Generate content
+        response = model.generate_content([prompt])
+        
+        # Extract image data (based on working test)
+        generated_images = []
+        
+        # Calculate filename once outside the loop
+        import glob
+        from dream_layer import get_directories
+        output_dir, _ = get_directories()
+        existing_files = glob.glob(os.path.join(output_dir, "DreamLayer_Banana_*.png"))
+        next_num = len(existing_files) + 1
+        
+        for candidate in response.candidates:
+            image_parts = [p for p in candidate.content.parts if hasattr(p, 'inline_data')]
+            if len(image_parts) >= 2:  # Process second part (index 1)
+                image_binary = image_parts[1].inline_data.data
+                filename = f"DreamLayer_Banana_{next_num:05d}_.png"
+                filepath = os.path.join(output_dir, filename)
+                
+                with open(filepath, 'wb') as f:
+                    f.write(image_binary)
+                
+                import shutil
+                served_images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'served_images')
+                os.makedirs(served_images_dir, exist_ok=True)
+                shutil.copy2(filepath, os.path.join(served_images_dir, filename))
+                
+                generated_images.append({
+                    "filename": filename,
+                    "url": f"http://localhost:5001/api/images/{filename}",
+                    "type": "output",
+                    "subfolder": ""
+                })
+                break
+        
+        # Return in expected format
+        return {
+            "status": "success",
+            "all_images": generated_images,
+            "generated_images": generated_images
+        }
+        
+    except Exception as e:
+        return {"error": f"Banana API error: {str(e)}"}
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -84,8 +148,14 @@ def handle_txt2img():
                     workflow = transform_to_txt2img_workflow(iteration_data)
                     print(f"Generated ComfyUI Workflow for iteration {iteration + 1}")
                     
-                    # Send to ComfyUI server
-                    comfy_response = send_to_comfyui(workflow)
+                    # Check if this is a banana model - bypass ComfyUI
+                    model_name = iteration_data.get('model_name', '').lower()
+                    if 'banana' in model_name:
+                        print("🍌 BANANA: Bypassing ComfyUI, calling Gemini directly")
+                        comfy_response = call_banana_api_directly(iteration_data)
+                    else:
+                        # Send to ComfyUI server
+                        comfy_response = send_to_comfyui(workflow)
                     
                     if "error" in comfy_response:
                         print(f"⚠️ Error in iteration {iteration + 1}: {comfy_response['error']}")

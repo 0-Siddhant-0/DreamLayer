@@ -24,3 +24,5 @@ opencv-python>=4.8.0
 nltk>=3.8
 # Image quality metrics (FID support)
 torchmetrics[image]>=1.0.0
+# Google Gemini API for banana nano model
+google-generativeai>=0.8.0
