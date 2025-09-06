@@ -61,10 +61,11 @@ def transform_to_txt2img_workflow(data):
 
         scheduler = data.get('scheduler', 'normal')
 
-        # Handle seed - enhanced from smallFeatures for -1 values
+        # Handle seed - respect random_seed flag from frontend
         try:
             seed = int(data.get('seed', 0))
-            if seed < 0:
+            random_seed = data.get('random_seed', False)
+            if seed < 0 or random_seed:
                 # Generate random seed between 0 and 2^31-1
                 seed = random.randint(0, 2**31 - 1)
         except (ValueError, TypeError):

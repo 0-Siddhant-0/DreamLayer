@@ -75,9 +75,10 @@ def handle_txt2img():
                 try:
                     print(f"\n🔄 Batch iteration {iteration + 1}/{batch_count}")
                     
-                    # Generate new random seed for each iteration
+                    # Only generate new random seed if random_seed is enabled
                     iteration_data = data.copy()
-                    iteration_data['seed'] = -1  # Force new random seed
+                    if data.get('random_seed', True):
+                        iteration_data['seed'] = -1  # Force new random seed
                     
                     # Transform to ComfyUI workflow
                     workflow = transform_to_txt2img_workflow(iteration_data)
