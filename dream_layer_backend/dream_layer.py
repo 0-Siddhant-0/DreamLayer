@@ -39,7 +39,7 @@ API_KEY_TO_MODELS = {
     "GEMINI_API_KEY": [
         {"id": "gemini-pro-vision", "name": "Gemini Pro Vision", "filename": "gemini-pro-vision"},
         {"id": "gemini-pro", "name": "Gemini Pro", "filename": "gemini-pro"},
-        {"id": "banana-gemini", "name": "Banana Gemini", "filename": "banana-gemini"},
+        {"id": "banana-gemini", "name": "Banana (Gemini 2.5 Flash Image)", "filename": "banana-gemini"},
     ],
     "LUMA_API_KEY": [
         {"id": "luma-photon", "name": "Luma Photon", "filename": "luma-photon"},

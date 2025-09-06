@@ -45,7 +45,7 @@ NODE_TO_API_KEY_MAPPING = {
     # Gemini Nodes
     "GeminiNode": "GEMINI_API_KEY",
     "GeminiInputFiles": "GEMINI_API_KEY",
-    "BananaImageNode": "GEMINI_API_KEY",
+    "ComfyUI_NanoBanana": "GEMINI_API_KEY",
     
     # Luma Image Node (direct API)
     "LumaImageNode": "LUMA_API_KEY",
