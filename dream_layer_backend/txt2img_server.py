@@ -227,25 +227,73 @@ def handle_txt2img_batch():
         prompts = data['prompts']
         all_generated_images = []
         failed_prompts = []
+        batch_seeds = []  # Store seeds from first prompt
         
         for i, prompt in enumerate(prompts):
-            try:
-                # Emit progress update
-                socketio.emit('progress', {
-                    'type': 'progress',
-                    'current': i + 1,
-                    'total': len(prompts),
-                    'current_prompt': prompt,
-                    'status': 'processing'
-                })
-                
-                iteration_data = data.copy()
-                iteration_data['prompt'] = prompt
-                
-                workflow = transform_to_txt2img_workflow(iteration_data)
-                comfy_response = send_to_comfyui(workflow)
-                
-                if "error" in comfy_response:
+            batch_count = data.get('batch_count', 1)
+            for batch_idx in range(batch_count):
+                try:
+                    # Emit progress update
+                    socketio.emit('progress', {
+                        'type': 'progress',
+                        'current': i + 1,
+                        'total': len(prompts),
+                        'current_prompt': prompt,
+                        'status': 'processing'
+                    })
+                    
+                    iteration_data = data.copy()
+                    iteration_data['prompt'] = prompt
+                    
+                    # Seed handling: store from first prompt, reuse for others
+                    if i == 0:  # First prompt: generate and store seeds
+                        if data.get('random_seed', True) or batch_idx > 0:
+                            iteration_data['seed'] = -1
+                        batch_seeds.append(iteration_data.get('seed', -1))
+                    else:  # Subsequent prompts: reuse stored seeds
+                        iteration_data['seed'] = batch_seeds[batch_idx]
+                    
+                    workflow = transform_to_txt2img_workflow(iteration_data)
+                    comfy_response = send_to_comfyui(workflow)
+                    
+                    if "error" in comfy_response:
+                        failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
+                        socketio.emit('progress', {
+                            'type': 'error',
+                            'current': i + 1,
+                            'total': len(prompts),
+                            'current_prompt': prompt,
+                            'status': 'failed'
+                        })
+                        continue
+                    
+                    generated_images = []
+                    if comfy_response.get("all_images"):
+                        for img_data in comfy_response["all_images"]:
+                            if isinstance(img_data, dict) and "filename" in img_data:
+                                generated_images.append(img_data["filename"])
+                        all_generated_images.extend(comfy_response["all_images"])
+                    
+                    run_config = create_run_config_from_generation_data(
+                        iteration_data, generated_images, "txt2img"
+                    )
+                    registry.add_run(run_config)
+                    
+                    # Emit generated images immediately (one per batch iteration)
+                    if comfy_response.get("all_images"):
+                        img_data = comfy_response["all_images"][0]  # Only emit first image from this iteration
+                        socketio.emit('image_generated', {'prompt': prompt, 'image_data': img_data, 'prompt_index': i + 1})
+                    
+                    # Emit completion for this prompt
+                    socketio.emit('progress', {
+                        'type': 'completed',
+                        'current': i + 1,
+                        'total': len(prompts),
+                        'current_prompt': prompt,
+                        'status': 'completed'
+                    })
+                    
+                except Exception as e:
                     failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
                     socketio.emit('progress', {
                         'type': 'error',
@@ -255,42 +303,6 @@ def handle_txt2img_batch():
                         'status': 'failed'
                     })
                     continue
-                
-                generated_images = []
-                if comfy_response.get("all_images"):
-                    for img_data in comfy_response["all_images"]:
-                        if isinstance(img_data, dict) and "filename" in img_data:
-                            generated_images.append(img_data["filename"])
-                    all_generated_images.extend(comfy_response["all_images"])
-                
-                run_config = create_run_config_from_generation_data(
-                    iteration_data, generated_images, "txt2img"
-                )
-                registry.add_run(run_config)
-                
-                # Emit generated images immediately
-                for img_data in comfy_response.get("all_images", []):
-                    socketio.emit('image_generated', {'prompt': prompt, 'image_data': img_data, 'prompt_index': i + 1})
-                
-                # Emit completion for this prompt
-                socketio.emit('progress', {
-                    'type': 'completed',
-                    'current': i + 1,
-                    'total': len(prompts),
-                    'current_prompt': prompt,
-                    'status': 'completed'
-                })
-                
-            except Exception as e:
-                failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
-                socketio.emit('progress', {
-                    'type': 'error',
-                    'current': i + 1,
-                    'total': len(prompts),
-                    'current_prompt': prompt,
-                    'status': 'failed'
-                })
-                continue
         
         # Emit batch completion
         socketio.emit('progress', {
