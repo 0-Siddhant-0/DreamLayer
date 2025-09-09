@@ -286,6 +286,7 @@ class DatabaseFidCalculator:
         
         for run in runs_without_fid:
             run_id = run['run_id']
+            if not self.queries.can_compute_metrics_for_run(run_id): continue
             fid_score = self.calculate_for_run(run_id)
             
             if fid_score is not None:

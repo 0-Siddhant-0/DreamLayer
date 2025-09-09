@@ -242,6 +242,11 @@ class DreamLayerQueries:
             logger.error(f"Error getting runs without composition metrics: {e}")
             return []
     
+    def can_compute_metrics_for_run(self, run_id: str) -> bool:
+        """Check if run has accessible image files for metrics computation"""
+        image_path = self.get_image_path_for_clip_score(run_id, 0)
+        return image_path is not None and os.path.exists(image_path)
+    
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get summary statistics for all metrics"""
         try:
