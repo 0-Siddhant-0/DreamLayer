@@ -254,7 +254,13 @@ def handle_txt2img_batch():
                         iteration_data['seed'] = batch_seeds[batch_idx]
                     
                     workflow = transform_to_txt2img_workflow(iteration_data)
-                    comfy_response = send_to_comfyui(workflow)
+                    
+                    # Check if this is a banana model - bypass ComfyUI
+                    model_name = iteration_data.get('model_name', '').lower()
+                    if 'banana' in model_name:
+                        comfy_response = call_banana_api_directly(iteration_data)
+                    else:
+                        comfy_response = send_to_comfyui(workflow)
                     
                     if "error" in comfy_response:
                         failed_prompts.append(f"Prompt {i+1}: {prompt[:50]}...")
