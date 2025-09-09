@@ -120,7 +120,7 @@ def ensure_clip_scores_calculated():
     """Convenience function to calculate missing ClipScores"""
     if db_integration.is_database_enabled():
         try:
-            stats = calculate_missing_clip_scores(limit=100)
+            stats = calculate_missing_clip_scores(limit=2000)
             return stats
         except Exception as e:
             print(f"Error calculating ClipScores: {e}")
@@ -131,7 +131,7 @@ def ensure_fid_scores_calculated():
     """Convenience function to calculate missing FiD scores"""
     if db_integration.is_database_enabled():
         try:
-            stats = calculate_missing_fid_scores(limit=100)
+            stats = calculate_missing_fid_scores(limit=2000)
             return stats
         except Exception as e:
             print(f"Error calculating FiD scores: {e}")
@@ -142,7 +142,7 @@ def ensure_composition_metrics_calculated():
     """Convenience function to calculate missing composition metrics"""
     if db_integration.is_database_enabled():
         try:
-            stats = calculate_missing_composition_metrics(limit=100)
+            stats = calculate_missing_composition_metrics(limit=2000)
             return stats
         except Exception as e:
             print(f"Error calculating composition metrics: {e}")

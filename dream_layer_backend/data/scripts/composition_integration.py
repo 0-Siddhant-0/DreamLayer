@@ -388,7 +388,7 @@ class DatabaseCompositionCalculator:
             logger.error(f"Error calculating composition metrics for run {run_id}: {e}")
             return None
     
-    def calculate_batch(self, limit: int = 50) -> Dict[str, Any]:
+    def calculate_batch(self, limit: int = 2000) -> Dict[str, Any]:
         """Calculate composition metrics for multiple runs that don't have it"""
         # Get runs without composition metrics
         runs_without_composition = self.queries.get_runs_without_composition_metrics(limit)
@@ -423,7 +423,7 @@ class DatabaseCompositionCalculator:
         return stats
 
 
-def calculate_missing_composition_metrics(limit: int = 50) -> Dict[str, Any]:
+def calculate_missing_composition_metrics(limit: int = 2000) -> Dict[str, Any]:
     """Convenience function to calculate missing composition metrics"""
     calculator = DatabaseCompositionCalculator()
     return calculator.calculate_batch(limit)

@@ -72,7 +72,7 @@ class DatabaseClipScoreCalculator:
             logger.error(f"Error calculating ClipScore for run {run_id}: {e}")
             return None
     
-    def calculate_batch(self, limit: int = 50) -> Dict[str, Any]:
+    def calculate_batch(self, limit: int = 2000) -> Dict[str, Any]:
         """Calculate ClipScore for multiple runs that don't have it"""
         if not self.clip_calculator:
             logger.error("ClipScore calculator not available")
@@ -165,7 +165,7 @@ class DatabaseClipScoreCalculator:
         logger.info(f"Recalculation complete: {stats['success']} success, {stats['failed']} failed")
         return stats
 
-def calculate_missing_clip_scores(limit: int = 50) -> Dict[str, Any]:
+def calculate_missing_clip_scores(limit: int = 2000) -> Dict[str, Any]:
     """Convenience function to calculate missing ClipScores"""
     calculator = DatabaseClipScoreCalculator()
     return calculator.calculate_batch(limit)
