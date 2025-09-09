@@ -149,6 +149,48 @@ def ensure_composition_metrics_calculated():
             return {"error": str(e)}
     return {"error": "Database not available"}
 
+def ensure_clip_scores_calculated_with_progress():
+    """Calculate ClipScores with WebSocket progress updates"""
+    if db_integration.is_database_enabled():
+        try:
+            from run_registry import socketio
+            socketio.emit('metrics_progress', {'type': 'clip', 'status': 'starting'})
+            stats = calculate_missing_clip_scores()
+            socketio.emit('metrics_progress', {'type': 'clip', 'status': 'completed', 'stats': stats})
+            return stats
+        except Exception as e:
+            print(f"Error calculating ClipScores: {e}")
+            return {"error": str(e)}
+    return {"error": "Database not available"}
+
+def ensure_fid_scores_calculated_with_progress():
+    """Calculate FiD scores with WebSocket progress updates"""
+    if db_integration.is_database_enabled():
+        try:
+            from run_registry import socketio
+            socketio.emit('metrics_progress', {'type': 'fid', 'status': 'starting'})
+            stats = calculate_missing_fid_scores()
+            socketio.emit('metrics_progress', {'type': 'fid', 'status': 'completed', 'stats': stats})
+            return stats
+        except Exception as e:
+            print(f"Error calculating FiD scores: {e}")
+            return {"error": str(e)}
+    return {"error": "Database not available"}
+
+def ensure_composition_metrics_calculated_with_progress():
+    """Calculate composition metrics with WebSocket progress updates"""
+    if db_integration.is_database_enabled():
+        try:
+            from run_registry import socketio
+            socketio.emit('metrics_progress', {'type': 'composition', 'status': 'starting'})
+            stats = calculate_missing_composition_metrics()
+            socketio.emit('metrics_progress', {'type': 'composition', 'status': 'completed', 'stats': stats})
+            return stats
+        except Exception as e:
+            print(f"Error calculating composition metrics: {e}")
+            return {"error": str(e)}
+    return {"error": "Database not available"}
+
 if __name__ == "__main__":
     # Test the integration
     integration = DatabaseIntegration()

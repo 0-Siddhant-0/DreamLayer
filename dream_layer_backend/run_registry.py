@@ -5,6 +5,7 @@ Saves new runs to database while maintaining API compatibility
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import json
 import uuid
 import logging
@@ -194,6 +195,7 @@ CORS(app, resources={
         "allow_headers": ["Content-Type"]
     }
 })
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/api/runs', methods=['GET'])
 def get_runs():
@@ -363,18 +365,23 @@ def get_runs_enhanced_v2():
     """Get all completed runs with all metrics (ClipScore, FiD, Composition) - v2 unified queries"""
     try:
         from dream_layer_backend_utils.unified_database_queries import get_all_runs_with_metrics
-        from database_integration import ensure_fid_scores_calculated, ensure_composition_metrics_calculated, ensure_clip_scores_calculated
+        from data.scripts.queries import DreamLayerQueries
         
-        # Ensure all metrics are calculated for all runs
-        ensure_clip_scores_calculated()
-        ensure_fid_scores_calculated()
-        ensure_composition_metrics_calculated()
-        
+        # Get existing data immediately
         enhanced_runs = get_all_runs_with_metrics()
+        
+        # Count pending metrics
+        queries = DreamLayerQueries()
+        pending_counts = {
+            "clip": len(queries.get_runs_without_clip_score()),
+            "fid": len(queries.get_runs_without_fid_score()),
+            "composition": len(queries.get_runs_without_composition_metrics())
+        }
         
         return jsonify({
             "status": "success",
             "runs": enhanced_runs,
+            "pending_metrics": pending_counts,
             "database_enabled": DATABASE_ENABLED,
             "enhancement_available": True,
             "count": len(enhanced_runs),
@@ -386,6 +393,21 @@ def get_runs_enhanced_v2():
             "status": "error",
             "message": str(e)
         }), 500
+
+@app.route('/api/runs/calculate-metrics', methods=['POST'])
+def calculate_metrics_background():
+    """Trigger background metrics calculation with WebSocket updates"""
+    try:
+        from database_integration import ensure_clip_scores_calculated_with_progress, ensure_fid_scores_calculated_with_progress, ensure_composition_metrics_calculated_with_progress
+        
+        # Start calculations with WebSocket progress updates
+        ensure_clip_scores_calculated_with_progress()
+        ensure_fid_scores_calculated_with_progress()
+        ensure_composition_metrics_calculated_with_progress()
+        
+        return jsonify({"status": "completed"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/runs/<run_id>/enhanced', methods=['GET'])
 def get_run_enhanced(run_id: str):
@@ -495,7 +517,7 @@ if __name__ == '__main__':
     print("🚀 Starting Enhanced Run Registry with Database Integration")
     print(f"📊 Database enabled: {DATABASE_ENABLED}")
     
-    app.run(host='0.0.0.0', port=5005, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5005, debug=True, allow_unsafe_werkzeug=True)
 
 @app.route('/api/database/stats', methods=['GET'])
 def get_database_stats():

@@ -49,6 +49,16 @@ export interface RunRegistryState {
   loading: boolean;
   error: string | null;
   selectedRun: RunConfig | null;
+  metricsProgress: {
+    clip: { status: 'idle' | 'starting' | 'completed', stats?: any };
+    fid: { status: 'idle' | 'starting' | 'completed', stats?: any };
+    composition: { status: 'idle' | 'starting' | 'completed', stats?: any };
+  };
+  pendingMetrics: {
+    clip: number;
+    fid: number;
+    composition: number;
+  };
 }
 
 export interface RunRegistryActions {

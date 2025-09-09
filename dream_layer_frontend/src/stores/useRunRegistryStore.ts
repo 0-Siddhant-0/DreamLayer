@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { RunConfig, RunRegistryState, RunRegistryActions } from '@/types/runRegistry';
+import { io, Socket } from 'socket.io-client';
 
 interface RunRegistryStore extends RunRegistryState, RunRegistryActions {}
 
 const API_BASE_URL = 'http://localhost:5005/api';
+let socket: Socket | null = null;
 
 export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   // Initial state
@@ -11,6 +13,16 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
   loading: false,
   error: null,
   selectedRun: null,
+  metricsProgress: {
+    clip: { status: 'idle' },
+    fid: { status: 'idle' },
+    composition: { status: 'idle' }
+  },
+  pendingMetrics: {
+    clip: 0,
+    fid: 0,
+    composition: 0
+  },
 
   // Actions
   fetchRuns: async () => {
@@ -48,6 +60,39 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
           macro_f1: run.macro_f1 || null
         }));
         set({ runs: normalizedRuns, loading: false });
+        
+        // Handle pending metrics from v2 API
+        if (data.pending_metrics) {
+          set({ pendingMetrics: data.pending_metrics });
+          
+          // Setup WebSocket for progress updates if not already connected
+          if (!socket) {
+            socket = io('http://localhost:5005');
+            socket.on('metrics_progress', (progressData) => {
+              set((state) => ({
+                metricsProgress: {
+                  ...state.metricsProgress,
+                  [progressData.type]: {
+                    status: progressData.status,
+                    stats: progressData.stats
+                  }
+                }
+              }));
+              
+              // Refresh runs when metrics calculation completes
+              if (progressData.status === 'completed') {
+                get().fetchRuns();
+              }
+            });
+          }
+          
+          // Trigger background calculation if there are pending metrics
+          const totalPending = data.pending_metrics.clip + data.pending_metrics.fid + data.pending_metrics.composition;
+          if (totalPending > 0) {
+            console.log(`🔄 Starting background calculation for ${totalPending} pending metrics...`);
+            fetch(`${API_BASE_URL}/runs/calculate-metrics`, { method: 'POST' });
+          }
+        }
         
         // Log ClipScore availability for debugging
         const runsWithClipScore = normalizedRuns.filter(run => run.clip_score_mean !== null);
