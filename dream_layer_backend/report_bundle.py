@@ -147,17 +147,8 @@ class ReportBundleGenerator:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         bundle_name = f"dreamlayer_report_{timestamp}"
         
-        # Ensure all metrics are calculated before generating report
-        try:
-            from database_integration import ensure_clip_scores_calculated, ensure_fid_scores_calculated, ensure_composition_metrics_calculated
-            
-            print("🔄 Calculating missing metrics for report...")
-            ensure_clip_scores_calculated()
-            ensure_fid_scores_calculated()
-            ensure_composition_metrics_calculated()
-            print("✅ Metrics calculation complete")
-        except Exception as e:
-            print(f"⚠️ Metrics calculation error: {e}")
+        # Read existing metrics from database for report generation
+        print("📊 Generating report from existing database metrics...")
         
         # Generate files
         csv_path = self.generate_csv(run_ids)
