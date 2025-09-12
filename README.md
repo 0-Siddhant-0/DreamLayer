@@ -1,7 +1,7 @@
 <h1 align="center">DreamLayer AI</h1>
 <p align="center">
-  <strong>The Cleanest, Fastest Stable Diffusion WebUI.</strong><br>
-  Built for AI artists, researchers, developers, and prompt engineers. Fully open source, and no hosting required.
+  <strong>The Fastest Way to Benchmark Diffusion Models.</strong><br>
+  Built for AI researchers, labs, and developers. Automates prompts, seeds, and metrics so benchmarks that take weeks now run reproducibly in hours.
 </p>
 
 <p align="center">
@@ -24,14 +24,14 @@
 
 ## What is DreamLayer AI?
 
-DreamLayer AI is an open-source Stable Diffusion WebUI that keeps the familiar Automatic1111 ⁄ Forge layout you know, replaces the clutter with a modern design system, and runs every generation step on ComfyUI in the background.  
-No node graph on screen, no server rental, just a lightning-fast local interface for:
+DreamLayer AI is an open-source Stable Diffusion WebUI that keeps the familiar Automatic1111 ⁄ Forge layout you know, replaces the clutter with a modern design system, and runs every generation step on ComfyUI in the background. 
+No custom scripts, no manual logging, no wasted compute. A streamlined workflow for:
 
-- **AI artists** producing portfolio-ready images
-- **Developers and prompt engineers** iterating on prompts and LoRAs
-- **Researchers** benchmarking new models and samplers
+- **AI researchers** benchmarking models, datasets, and samplers
+- **Labs and teams** running reproducible evaluations across multiple seeds and configs
+- **Developers** integrating custom metrics and evaluation pipelines
 
-> **Status:** ✨ **Now live:** Open Alpha • **Beta V1 ships:** **Mid-July 2025**
+> **Status:** ✨ **Now live: Beta V1**
 
 > ⭐ Star the repo for updates & to get early-supporter perks
 
@@ -161,11 +161,11 @@ _The installation scripts will automatically install all dependencies and set up
 
 | 🔍 Feature                      | 🚀 How it’s better                                                                                          |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Familiar Layout**             | If you’ve used A1111 or Forge, you’ll feel at home in sec. Zero learning curve                              |
-| **Modern UX**                   | Responsive design with light & dark themes and a clutter-free interface that lets you work faster           |
-| **ComfyUI Engine Inside**       | All generation runs on a proven, modular, stable ComfyUI backend. Ready for custom nodes and advanced hacks |
-| **Closed-Source Model Support** | One-click swap to GPT-4o Image, Ideogram V3, Runway Gen-4, Recraft V3, and more                             |
-| **Local first**                 | Runs entirely on your GPU with no hosting fees, full privacy, and instant acceleration out of the box       |
+| **Automated Benchmarking**             | Turn a 1–2 week manual benchmarking task into 3–5 hours per model                              |
+| **Reproducibility**                   | Every run is logged with prompts, seeds, configs, and metrics for exact replay           |
+| **Metrics Built In**       | CLIP Score, FID, Precision, Recall, F1 with support for custom metrics |
+| **Multi Modal Ready** | Benchmark image, video, and audio models with one pipeline                             |
+| **Researcher Friendly**                 | Runs locally or on your GPUs with CSV exports, reports, and leaderboard ready outputs       |
 
 ---
 
