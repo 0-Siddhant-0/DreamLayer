@@ -87,7 +87,7 @@ export const useRunRegistryStore = create<RunRegistryStore>((set, get) => ({
           }
           
           // Trigger background calculation if there are pending metrics
-          const totalPending = data.pending_metrics.clip + data.pending_metrics.fid + data.pending_metrics.composition;
+          const totalPending = data.pending_metrics.clip + data.pending_metrics.fid + (data.pending_metrics.composition || 0);
           if (totalPending > 0) {
             console.log(`🔄 Starting background calculation for ${totalPending} pending metrics...`);
             fetch(`${API_BASE_URL}/runs/calculate-metrics`, { method: 'POST' });

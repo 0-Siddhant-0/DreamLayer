@@ -375,7 +375,7 @@ def get_runs_enhanced_v2():
         pending_counts = {
             "clip": len(queries.get_runs_without_clip_score()),
             "fid": len(queries.get_runs_without_fid_score()),
-            "composition": len(queries.get_runs_without_composition_metrics())
+            # "composition": len(queries.get_runs_without_composition_metrics())
         }
         
         return jsonify({
@@ -403,7 +403,7 @@ def calculate_metrics_background():
         # Start calculations with WebSocket progress updates
         ensure_clip_scores_calculated_with_progress()
         ensure_fid_scores_calculated_with_progress()
-        ensure_composition_metrics_calculated_with_progress()
+        # ensure_composition_metrics_calculated_with_progress()
         
         return jsonify({"status": "completed"})
     except Exception as e:
