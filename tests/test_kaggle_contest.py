@@ -17,7 +17,11 @@ def test_scoring():
         final_score = score(
             solution=solution_df,
             submission_zip_path=submission_zip,
-            row_id_column_name='id'
+            row_id_column_name='id',
+            labels=None,
+            pos_label=1,
+            average='binary',
+            weights_column_name=None
         )
         print(f"✅ Final Score: {final_score}")
         print(f"Score breakdown: 0.5 × CLIPScore - 0.5 × FID_norm = {final_score}")

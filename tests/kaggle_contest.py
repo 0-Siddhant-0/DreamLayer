@@ -9,9 +9,6 @@ from transformers import CLIPProcessor, CLIPModel
 from scipy import linalg
 from torchvision import transforms
 import sklearn.metrics
-import urllib.request
-import tarfile
-import pickle
 from typing import Sequence, Union, Optional
 
 
@@ -34,34 +31,9 @@ def download_cifar_reference_images(reference_dir: str = './cifar_reference') ->
     
     os.makedirs(reference_dir, exist_ok=True)
     
-    # Download CIFAR-10
-    cifar_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
-    cifar_file = os.path.join(reference_dir, 'cifar-10-python.tar.gz')
-    cifar_dir = os.path.join(reference_dir, 'cifar-10-batches-py')
-    
-    if not os.path.exists(cifar_dir):
-        urllib.request.urlretrieve(cifar_url, cifar_file)
-        
-        with tarfile.open(cifar_file, 'r:gz') as tar:
-            tar.extractall(reference_dir)
-        
-        os.remove(cifar_file)
-    
-    # Convert CIFAR batches to images
-    images_dir = os.path.join(reference_dir, 'images')
-    os.makedirs(images_dir, exist_ok=True)
-    
-    if not os.listdir(images_dir):
-        for i in range(1, 6):
-            batch_file = os.path.join(cifar_dir, f'data_batch_{i}')
-            with open(batch_file, 'rb') as f:
-                batch = pickle.load(f, encoding='bytes')
-            
-            data = batch[b'data'].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
-            
-            for j, img_data in enumerate(data[:200]):  # 200 images per batch = 1000 total
-                img = Image.fromarray(img_data)
-                img.save(os.path.join(images_dir, f'cifar_{i}_{j}.png'))
+    # Download pre-converted CIFAR PNG images from a safe source
+    os.system("wget -q https://github.com/YoongiKim/CIFAR-10-images/archive/master.zip")
+    os.system("unzip -q master.zip && mv CIFAR-10-images-master/train cifar_reference/images")
     
     return images_dir
 
