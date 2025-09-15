@@ -24,7 +24,8 @@
 
 ## What is DreamLayer AI?
 
-DreamLayer AI is an open-source Stable Diffusion WebUI that keeps the familiar Automatic1111 ⁄ Forge layout you know, replaces the clutter with a modern design system, and runs every generation step on ComfyUI in the background. 
+DreamLayer AI is an open source platform for benchmarking and evaluating diffusion models. It currently supports image generation, with video and audio model benchmarking coming soon. It automates the full workflow from prompts and seeds to metrics and logging, making experiments reproducible by default.
+
 No custom scripts, no manual logging, no wasted compute. A streamlined workflow for:
 
 - **AI researchers** benchmarking models, datasets, and samplers
