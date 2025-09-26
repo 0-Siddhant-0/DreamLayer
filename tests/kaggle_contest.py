@@ -10,6 +10,12 @@ from scipy import linalg
 from torchvision import transforms
 import sklearn.metrics
 from typing import Sequence, Union, Optional
+from ultralytics import YOLO
+import gdown
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
+from nltk.stem import WordNetLemmatizer
 
 
 class ParticipantVisibleError(Exception):
@@ -252,3 +258,92 @@ def score(solution: pd.DataFrame, submission_zip_path: str, row_id_column_name: 
     print("✅ Computed final score")
     
     return final_score
+
+
+def download_yolo_file():
+    model = YOLO('yolov8n.pt')
+    return 'yolov8n.pt'
+
+def download_from_drive(drive_link):
+    import gdown
+    gdown.download_folder(drive_link, output='kaggle_resources', quiet=False, use_cookies=False)
+    return [os.path.join('kaggle_resources', f) for f in os.listdir('kaggle_resources') if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+def apply_object_detection(yolo_file, generated_df):
+    model = YOLO(yolo_file)
+    def detect_objects(img):
+        try:
+            detections = model(os.path.join('kaggle_resources', img))[0]
+            return [model.names[int(cls)] for cls in detections.boxes.cls] if detections.boxes is not None else []
+        except:
+            return []
+    generated_df['predicted_objects'] = [detect_objects(img) for img in generated_df['generated_images']]
+    return generated_df
+
+def parse_results_from_drive(drive_link):
+    gdown.download_folder(drive_link, output='kaggle_resources', quiet=False, use_cookies=False)
+    csv_data = pd.read_csv('kaggle_resources/results.csv')
+    return csv_data[['run_id', 'prompt', 'filenames']].rename(columns={'filenames': 'generated_images'})
+
+def parse_results_from_zip(zip_file_path):
+    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        zip_ref.extractall('kaggle_resources')
+    csv_data = pd.read_csv('kaggle_resources/results.csv')
+    return csv_data[['run_id', 'prompt', 'filenames']].rename(columns={'filenames': 'generated_images'})
+
+def score(solution: pd.DataFrame, submission: pd.DataFrame) -> float:
+    """
+    Calculate the average F1 score between predicted and ground truth objects using proper precision/recall.
+    
+    Args:
+        solution: DataFrame with 'ID' and 'ground_truth' columns
+        submission: DataFrame with 'ID' and 'predicted_objects' columns
+    
+    Returns:
+        float: Average F1 score across all prompts using TP, FP, FN calculations
+    """
+    import ast
+    merged = solution.merge(submission, on='ID', how='left')
+    merged['predicted_objects'] = merged['predicted_objects'].fillna('[]').apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    merged['ground_truth'] = merged['ground_truth'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    
+    f1_scores = []
+    for pred, truth in zip(merged['predicted_objects'], merged['ground_truth']):
+        pred_set, truth_set = set(pred), set(truth)
+        tp = len(pred_set & truth_set)
+        fp = len(pred_set - truth_set)
+        fn = len(truth_set - pred_set)
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        f1_scores.append(f1)
+    
+    return np.mean(f1_scores)
+
+def add_id_to_submission(submission_df, solution_df):
+    merged = solution_df[['ID', 'prompt']].merge(submission_df, on='prompt', how='left')
+    merged['predicted_objects'] = merged['predicted_objects'].fillna('').apply(lambda x: x if isinstance(x, list) else [])
+    merged[['run_id', 'generated_images']] = merged[['run_id', 'generated_images']].fillna("missing_information")
+    return merged
+
+def extract_ground_truth(drive_link):
+    import nltk
+    from nltk.tokenize import word_tokenize
+    from nltk.tag import pos_tag
+    from nltk.stem import WordNetLemmatizer
+    
+    lemmatizer = WordNetLemmatizer()
+    doc_id = drive_link.split('/d/')[1].split('/')[0]
+    export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+    gdown.download(export_url, 'temp_prompts.txt', quiet=False)
+    with open('temp_prompts.txt', 'r') as f:
+        prompts = f.readlines()
+    
+    results = []
+    for i, prompt in enumerate(prompts):
+        tokens = word_tokenize(prompt.lower().strip())
+        pos_tags = pos_tag(tokens)
+        nouns = [lemmatizer.lemmatize(word) for word, pos in pos_tags if pos.startswith('NN')]
+        results.append({'ID': i+1, 'prompt_id': i, 'prompt': prompt.strip(), 'ground_truth': nouns, 'Usage': 'Public'})
+    
+    return pd.DataFrame(results)
