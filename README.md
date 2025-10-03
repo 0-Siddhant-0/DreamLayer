@@ -596,6 +596,7 @@ We’re grateful to our earliest supporters who starred the repo and supported u
   <tr>
     <td valign="top">@almzayyen: https://github.com/almzayyen</td>
     <td valign="top">@derickmr: https://github.com/derickmr</td>
+    <td valign="top">@gastondana627: https://github.com/gastondana627</td>
   </tr>
 </table>
 
