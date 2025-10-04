@@ -148,12 +148,29 @@ class RunRegistry:
         return list(self.runs.values())
     
     def delete_run(self, run_id: str) -> bool:
-        """Delete a run"""
+        """Delete a run from both the database and the JSON backup"""
+        db_deleted = False
+        json_deleted = False
+
+        if DATABASE_ENABLED:
+            try:
+                from database import get_database
+                db = get_database()
+                if db.delete_run(run_id):
+                    logger.info(f"Successfully deleted run {run_id} from database.")
+                    db_deleted = True
+                else:
+                    logger.warning(f"Run {run_id} not found in database for deletion.")
+            except Exception as e:
+                logger.error(f"Error deleting run {run_id} from database: {e}")
+
         if run_id in self.runs:
             del self.runs[run_id]
             self.save_runs()
-            return True
-        return False
+            logger.info(f"Successfully deleted run {run_id} from JSON registry.")
+            json_deleted = True
+
+        return db_deleted or json_deleted 
 
 def create_run_config_from_generation_data(generation_data: Dict[str, Any], 
                                          generated_images: List[str], 

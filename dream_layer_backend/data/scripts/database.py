@@ -515,6 +515,18 @@ class DreamLayerDB:
             logger.error(f"Error getting composition metrics for run {run_id}: {e}")
             return None
 
+    def delete_run(self, run_id: str) -> bool:
+        """Delete a single run and its related data from the database"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
+                conn.commit()
+                # rowcount will be > 0 if a row was deleted
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error deleting run {run_id}: {e}")
+            return False
+
 # Convenience function for getting database instance
 def get_database() -> DreamLayerDB:
     """Get a database instance"""
