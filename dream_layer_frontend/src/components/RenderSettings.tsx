@@ -202,7 +202,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 14,
   },
   { 
-    id: "dpm-2m-karras", 
+    id: "dpmpp_2m", 
     label: "DPM++ 2M Karras",
     description: "Fuses high-fidelity textures with Karras scheduling for sharp, photorealistic product and branding images. It's too slow for abstract or chaotic art.",
     speed: "Medium",

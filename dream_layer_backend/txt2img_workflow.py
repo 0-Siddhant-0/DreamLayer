@@ -55,9 +55,11 @@ def transform_to_txt2img_workflow(data):
         cfg_scale = max(1.0, min(20.0, float(data.get('cfg_scale', 7.0))))
 
         # Get sampler name and map it to ComfyUI format (from smallFeatures)
-        frontend_sampler = data.get('sampler_name', 'euler')
-        sampler_name = SAMPLER_NAME_MAP.get(frontend_sampler, 'euler')
-        print(f"\nMapping sampler name: {frontend_sampler} -> {sampler_name}")
+        #frontend_sampler = data.get('sampler_name', 'euler')
+        #sampler_name = SAMPLER_NAME_MAP.get(frontend_sampler, 'euler')
+        #print(f"\nMapping sampler name: {frontend_sampler} -> {sampler_name}")
+        sampler_name = data.get('sampler_name', 'euler')
+        print(f"\nUsing sampler name from frontend: {sampler_name}")
 
         scheduler = data.get('scheduler', 'normal')
 
