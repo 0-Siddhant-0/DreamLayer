@@ -129,7 +129,7 @@ class ReportBundleGenerator:
             run_config = {
                 key: run.get(key) for key in [
                     'run_id', 'timestamp', 'model', 'vae', 'prompt', 'negative_prompt',
-                    'seed', 'sampler', 'steps', 'cfg_scale', 'width', 'height',
+                    'seed', 'sampler', 'scheduler', 'steps', 'cfg_scale', 'width', 'height',
                     'batch_size', 'batch_count', 'generation_type', 'loras', 'controlnets',
                     'generated_images', 'workflow', 'version'
                 ]

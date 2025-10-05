@@ -42,7 +42,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 18,
   },
   { 
-    id: "euler-a", 
+    id: "euler_ancestral", 
     label: "Euler A",
     description: "Makes images super fast for quick drafts and abstract art, so you can explore ideas rapidly. It's not good for precise prompts or fine detail at high CFG.",
     speed: "Very Fast",

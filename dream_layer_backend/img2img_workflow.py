@@ -82,7 +82,7 @@ def transform_to_img2img_workflow(data):
     input_image = data.get('input_image', '')
     model_name = data.get('model_name', 'v1-6-pruned-emaonly-fp16.safetensors')
     sampler_name = data.get('sampler_name', 'euler')
-    scheduler = data.get('scheduler', 'normal')
+    scheduler = data.get('scheduler', 'karras')
 
     # Advanced settings
     vae_name = data.get('vae_name')

@@ -40,6 +40,7 @@ class RunConfig:
     negative_prompt: str = ""
     seed: int = 0
     sampler: str = "euler"
+    scheduler: str = "karras"
     steps: int = 20
     cfg_scale: float = 7.0
     width: int = 512
@@ -189,6 +190,7 @@ def create_run_config_from_generation_data(generation_data: Dict[str, Any],
         seed=generation_data.get('seed', 0),
         #sampler=generation_data.get('sampler', 'euler'),
         sampler=generation_data.get('sampler_name', 'euler'),
+        scheduler=generation_data.get('scheduler', 'karras'),
         steps=generation_data.get('steps', 20),
         cfg_scale=generation_data.get('cfg_scale', 7.0),
         width=generation_data.get('width', 512),

@@ -67,6 +67,7 @@ class DreamLayerDB:
                     negative_prompt TEXT,
                     seed INTEGER,
                     sampler TEXT,
+                    scheduler TEXT,
                     steps INTEGER,
                     cfg_scale REAL,
                     width INTEGER,
@@ -125,9 +126,22 @@ class DreamLayerDB:
             
             conn.commit()
             logger.info("Database schema created successfully")
+
+
+    def _add_scheduler_column_if_missing(self):
+        """Migration logic to add the scheduler column to an existing database."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("PRAGMA table_info(runs)")
+            columns = [row['name'] for row in cursor.fetchall()]
+            if 'scheduler' not in columns:
+                logger.info("Adding missing 'scheduler' column to 'runs' table.")
+                conn.execute("ALTER TABLE runs ADD COLUMN scheduler TEXT")
+                conn.commit()
+                logger.info("'scheduler' column added successfully.")
     
     def ensure_all_tables_exist(self):
         """Check for missing tables and create them automatically"""
+        self._add_scheduler_column_if_missing()
         with self.get_connection() as conn:
             # Check if composition_metrics table exists
             cursor = conn.execute("""
@@ -200,10 +214,10 @@ class DreamLayerDB:
                 conn.execute("""
                     INSERT OR REPLACE INTO runs (
                         run_id, timestamp, model, vae, loras, controlnets,
-                        prompt, negative_prompt, seed, sampler, steps, cfg_scale,
+                        prompt, negative_prompt, seed, sampler, scheduler, steps, cfg_scale,
                         width, height, batch_size, batch_count, workflow,
                         version, generation_type, generated_images
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     processed_data.get('run_id'),
                     processed_data.get('timestamp'),
@@ -215,6 +229,7 @@ class DreamLayerDB:
                     processed_data.get('negative_prompt'),
                     processed_data.get('seed'),
                     processed_data.get('sampler'),
+                    processed_data.get('scheduler'),
                     processed_data.get('steps'),
                     processed_data.get('cfg_scale'),
                     processed_data.get('width'),

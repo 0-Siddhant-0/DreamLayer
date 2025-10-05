@@ -9,8 +9,8 @@
         "model": ["4", 0],
         "negative": ["7", 0],
         "positive": ["6", 0],
-        "sampler_name": "euler",
-        "scheduler": "normal",
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
         "seed": 0,
         "steps": 20
       }
