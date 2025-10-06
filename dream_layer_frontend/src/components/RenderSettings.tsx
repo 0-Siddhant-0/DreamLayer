@@ -32,7 +32,7 @@ interface RenderSettingsProps {
 
 const renderStyles: RenderStyleOption[] = [
   {
-    id: "dpm-sde-karras",
+    id: "dpmpp-sde",
     label: "DPM++ SDE Karras",
     description: "Layers structured stochastic noise with Karras steps to create rich, poster-grade visuals. It's not made for quick iteration loops.",
     speed: "Slow",
@@ -102,7 +102,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 13,
   },
   { 
-    id: "dpm2-a", 
+    id: "dpm-2-ancestral", 
     label: "DPM2 a",
     description: "Adds creative noise on top of DPM2's structure, so you get stylized, varied renders. It's less precise and can't match strict realism every time.",
     speed: "Moderate",
@@ -112,7 +112,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 12,
   },
   { 
-    id: "dpm-2s-a", 
+    id: "dpmpp-2s-ancestral", 
     label: "DPM++ 2S a",
     description: "Blends structure with noise for expressive, flexible images, ideal for imaginative art. It's not designed for photo-exact or strict realism.",
     speed: "Moderate",
@@ -122,7 +122,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 13,
   },
   { 
-    id: "dpm-2m", 
+    id: "dpmpp-2m", 
     label: "DPM++ 2M",
     description: "Balances accuracy and texture for clean, high-fidelity portraits, characters, and general use. It's too slow for workflows that need quick iteration.",
     speed: "Medium",
@@ -132,7 +132,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 14,
   },
   { 
-    id: "dpm-sde", 
+    id: "dpmpp_sde", 
     label: "DPM++ SDE",
     description: "Injects structured noise for vivid, deep details and strong prompt accuracy, perfect for final detailed renders. It's too slow for fast workflows or animations.",
     speed: "Slow",
@@ -142,7 +142,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 15,
   },
   { 
-    id: "dpm-fast", 
+    id: "dpm_fast", 
     label: "DPM fast",
     description: "Prioritizes speed over precision, giving you rapid bulk generations and quick tests. It produces fuzzier, less refined results on complex prompts.",
     speed: "Very Fast",
@@ -152,7 +152,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 10,
   },
   { 
-    id: "dpm-adaptive", 
+    id: "dpm_adaptive", 
     label: "DPM adaptive",
     description: "Smartly adjusts its steps based on scene complexity, giving efficient mixed-detail outputs. It's not ideal if you need full manual control or consistent style.",
     speed: "Fast",
@@ -162,7 +162,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 12,
   },
   { 
-    id: "lms-karras", 
+    id: "lms", 
     label: "LMS Karras",
     description: "Uses Karras scheduling to smooth gradients and refine tones, great for portraits and subtle shading. It can't handle highly dynamic textures well.",
     speed: "Moderate",
@@ -172,7 +172,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 13,
   },
   { 
-    id: "dpm2-karras", 
+    id: "dpm_2", 
     label: "DPM2 Karras",
     description: "Enhance detail progression, perfect for realistic images with clean shading. It's not suited for tasks where speed is top priority.",
     speed: "Moderate",
@@ -182,7 +182,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 14,
   },
   { 
-    id: "dpm2-a-karras", 
+    id: "dpm_2_ancestral", 
     label: "DPM2 a Karras",
     description: "Merges creative ancestral noise with Karras scheduling, delivering diverse stylized realism. It can't guarantee the same result every run.",
     speed: "Moderate",
@@ -192,7 +192,7 @@ const renderStyles: RenderStyleOption[] = [
     optimumCfgMax: 14,
   },
   { 
-    id: "dpm-2s-a-karras", 
+    id: "dpmpp_2s_ancestral", 
     label: "DPM++ 2S a Karras",
     description: "Combines expressive noise and Karras smoothing, making it ideal for creative illustrations. It lacks the consistency needed for extreme realism.",
     speed: "Moderate",

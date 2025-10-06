@@ -45,11 +45,11 @@
         "positive": ["3", 0],
         "negative": ["4", 0],
         "latent_image": ["5", 0],
-        "sampler_name": "dpmpp_2m",
+        "sampler_name": "euler",
         "steps": 30,
         "cfg": 8.0,
         "seed": 0,
-        "scheduler": "karras",
+        "scheduler": "normal",
         "denoise": 1.0
       }
     },

@@ -539,7 +539,7 @@ def inject_hires_fix_parameters(workflow, hires_fix_data):
                 "steps": hires_steps,
                 "cfg": 7.0,  # Could be parameterized
                 "sampler_name": "euler",
-                "scheduler": "karras",
+                "scheduler": "normal",
                 "denoise": denoising_strength
             }
         }
@@ -656,7 +656,7 @@ def inject_refiner_parameters(workflow, refiner_data):
                 "steps": 10,  # You may want to parameterize this
                 "cfg": 7.0,
                 "sampler_name": "euler",
-                "scheduler": "karras",
+                "scheduler": "normal",
                 "denoise": 1.0,
                 "refiner_switch_at": switch_at
             }

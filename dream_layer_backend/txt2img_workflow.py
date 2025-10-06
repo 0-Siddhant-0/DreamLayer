@@ -60,9 +60,9 @@ def transform_to_txt2img_workflow(data):
         #print(f"\nMapping sampler name: {frontend_sampler} -> {sampler_name}")
         sampler_name = data.get('sampler_name', 'euler')
         print(f"\nUsing sampler name from frontend: {sampler_name}")
-
-        scheduler = 'karras'
-
+        
+        scheduler = 'karras' 
+        
         # Handle seed - respect random_seed flag from frontend
         try:
             seed = int(data.get('seed', 0))
