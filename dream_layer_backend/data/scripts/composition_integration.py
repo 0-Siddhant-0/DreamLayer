@@ -256,82 +256,115 @@ class CompositionMetricsCalculator:
             logger.error(f"Error detecting objects in {image_path}: {e}")
             return []
     
-    def calculate_metrics(self, prompt: str, image_path: str) -> Dict[str, Any]:
-        """Calculate composition correctness metrics for a single image-prompt pair"""
+    # --- NEW, ISOLATED HELPER FUNCTIONS FOR YOUR LOGIC ---
+    
+    def _my_logic_get_ground_truth(self, prompt: str) -> List[str]:
         try:
-            # Extract target objects from prompt
-            target_data = self.extract_target_objects(prompt)
-            target_objects = target_data["mapped_objects"]
-            
-            if not target_objects:
-                return self._empty_metrics()
-            
-            # Detect objects in image
-            detections = self.detect_objects(image_path)
-            
-            # Count detected objects
-            detected_counts = {}
-            for detection in detections:
-                class_name = detection["class_name"]
-                detected_counts[class_name] = detected_counts.get(class_name, 0) + 1
-            
-            # Calculate per-class metrics
-            per_class_metrics = {}
-            all_classes = set(target_objects.keys()) | set(detected_counts.keys())
-            
-            for class_name in all_classes:
-                target_count = target_objects.get(class_name, 0)
-                detected_count = detected_counts.get(class_name, 0)
-                
-                # Calculate precision, recall, F1 for this class
-                if detected_count > 0:
-                    precision = min(target_count, detected_count) / detected_count
-                else:
-                    precision = 1.0 if target_count == 0 else 0.0
-                
-                if target_count > 0:
-                    recall = min(target_count, detected_count) / target_count
-                else:
-                    recall = 1.0 if detected_count == 0 else 0.0
-                
-                if precision + recall > 0:
-                    f1 = 2 * (precision * recall) / (precision + recall)
-                else:
-                    f1 = 0.0
-                
-                per_class_metrics[class_name] = {
-                    "precision": precision,
-                    "recall": recall,
-                    "f1": f1,
-                    "target_count": target_count,
-                    "detected_count": detected_count
-                }
-            
-            # Calculate macro metrics
-            if per_class_metrics:
-                macro_precision = statistics.mean([m["precision"] for m in per_class_metrics.values()])
-                macro_recall = statistics.mean([m["recall"] for m in per_class_metrics.values()])
-                macro_f1 = statistics.mean([m["f1"] for m in per_class_metrics.values()])
-            else:
-                macro_precision = macro_recall = macro_f1 = 0.0
-            
-            # Identify missing objects
-            missing_objects = {k: v for k, v in target_objects.items() if k not in detected_counts}
-            
-            return {
-                "macro_precision": macro_precision,
-                "macro_recall": macro_recall,
-                "macro_f1": macro_f1,
-                "per_class_metrics": per_class_metrics,
-                "detected_objects": detected_counts,
-                "missing_objects": missing_objects,
-                "target_objects": target_objects
+            tokens = word_tokenize(prompt.lower().strip())
+            pos_tags = pos_tag(tokens)
+
+            ground_truth_words = {
+                self.lemmatizer.lemmatize(word) for word, pos in pos_tags
+                if pos.startswith('NN')
             }
             
+            return sorted(list(ground_truth_words))
         except Exception as e:
-            logger.error(f"Error calculating composition metrics: {e}")
-            return self._empty_metrics()
+            logger.error(f"Error in _my_logic_get_ground_truth: {e}")
+            return []
+
+    def _my_logic_get_predictions(self, image_path: str) -> List[str]:
+        if not os.path.exists(image_path):
+            logger.error(f"Image file not found for prediction: {image_path}")
+            return []
+
+        try:
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(script_dir, 'yolov8n.pt')
+
+            model = YOLO(model_path)
+            detections = model(image_path, verbose=False)[0]
+
+            if detections.boxes is not None:
+                predicted_objects = [model.names[int(cls)] for cls in detections.boxes.cls]
+                return predicted_objects
+            else:
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error during explicit YOLO prediction for {image_path}: {e}")
+            return []
+
+    # --- THE MODIFIED MAIN FUNCTION ---
     
+    def calculate_metrics(self, prompt: str, image_path: str) -> Dict[str, Any]:
+        """
+        Calculates all original metrics, then runs a new parallel pipeline
+        to calculate a custom F1 score and overwrites the final result.
+        """
+        try:
+            original_target_data = self.extract_target_objects(prompt)
+            original_target_objects = original_target_data["mapped_objects"]
+            
+            if not original_target_objects:
+                return self._empty_metrics()
+            
+            original_detections = self.detect_objects(image_path)
+            original_detected_counts = {}
+            for detection in original_detections:
+                class_name = detection["class_name"]
+                original_detected_counts[class_name] = original_detected_counts.get(class_name, 0) + 1
+            
+            per_class_metrics = {}
+            all_classes = set(original_target_objects.keys()) | set(original_detected_counts.keys())
+            
+            for class_name in all_classes:
+                target_count = original_target_objects.get(class_name, 0)
+                detected_count = original_detected_counts.get(class_name, 0)
+                precision = min(target_count, detected_count) / detected_count if detected_count > 0 else (1.0 if target_count == 0 else 0.0)
+                recall = min(target_count, detected_count) / target_count if target_count > 0 else (1.0 if detected_count == 0 else 0.0)
+                f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+                per_class_metrics[class_name] = {"precision": precision, "recall": recall, "f1": f1, "target_count": target_count, "detected_count": detected_count}
+            
+            macro_precision = statistics.mean([m["precision"] for m in per_class_metrics.values()]) if per_class_metrics else 0.0
+            macro_recall = statistics.mean([m["recall"] for m in per_class_metrics.values()]) if per_class_metrics else 0.0
+            missing_objects = {k: v for k, v in original_target_objects.items() if k not in original_detected_counts}
+        except Exception as e:
+            logger.error(f"Error during original metric calculation pipeline: {e}")
+            return self._empty_metrics()
+
+
+        my_logic_ground_truth = self._my_logic_get_ground_truth(prompt)
+        my_logic_predictions = self._my_logic_get_predictions(image_path)
+
+        logger.info(f"MY_LOGIC Ground Truth: {my_logic_ground_truth}")
+        logger.info(f"MY_LOGIC Predictions: {my_logic_predictions}")
+
+        truth_set = set(my_logic_ground_truth)
+        pred_set = set(my_logic_predictions)
+        
+        tp = len(pred_set & truth_set)
+        fp = len(pred_set - truth_set)
+        fn = len(truth_set - pred_set)
+        
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        my_logic_f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        
+        logger.info(f"MY_LOGIC Calculated F1 Score: {my_logic_f1_score:.4f}")
+
+        final_metrics = {
+            "macro_precision": macro_precision,                 # From original logic
+            "macro_recall": macro_recall,                       # From original logic
+            "macro_f1": my_logic_f1_score,                      # <-- OVERWRITTEN with your F1 score
+            "per_class_metrics": per_class_metrics,             # From original logic
+            "detected_objects": original_detected_counts,       # From original logic
+            "missing_objects": missing_objects,                 # From original logic
+            "target_objects": original_target_objects           # From original logic
+        }
+        return final_metrics
+
     def _empty_metrics(self) -> Dict[str, Any]:
         """Return empty metrics structure"""
         return {
@@ -404,7 +437,7 @@ class DatabaseCompositionCalculator:
         
         for run in runs_without_composition:
             run_id = run['run_id']
-            if not self.queries.can_compute_metrics_for_run(run_id): continue
+            #if not self.queries.can_compute_metrics_for_run(run_id): continue
             metrics = self.calculate_for_run(run_id)
             
             if metrics is not None:

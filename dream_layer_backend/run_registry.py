@@ -306,7 +306,7 @@ def add_run():
             negative_prompt=data.get('negative_prompt', ''),
             seed=data.get('seed', 0),
             sampler=data.get('sampler', 'euler'),
-            scheduler= 'karras'
+            scheduler= 'karras',
             steps=data.get('steps', 20),
             cfg_scale=data.get('cfg_scale', 7.0),
             width=data.get('width', 512),
@@ -422,8 +422,8 @@ def calculate_metrics_background():
         from database_integration import ensure_clip_scores_calculated_with_progress, ensure_fid_scores_calculated_with_progress, ensure_composition_metrics_calculated_with_progress
         
         # Start calculations with WebSocket progress updates
-        ensure_clip_scores_calculated_with_progress()
-        ensure_fid_scores_calculated_with_progress()
+        #ensure_clip_scores_calculated_with_progress()
+        #ensure_fid_scores_calculated_with_progress()
         ensure_composition_metrics_calculated_with_progress()
         
         return jsonify({"status": "completed"})
