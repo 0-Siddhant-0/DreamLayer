@@ -422,8 +422,8 @@ def calculate_metrics_background():
         from database_integration import ensure_clip_scores_calculated_with_progress, ensure_fid_scores_calculated_with_progress, ensure_composition_metrics_calculated_with_progress
         
         # Start calculations with WebSocket progress updates
-        #ensure_clip_scores_calculated_with_progress()
-        #ensure_fid_scores_calculated_with_progress()
+        ensure_clip_scores_calculated_with_progress()
+        ensure_fid_scores_calculated_with_progress()
         ensure_composition_metrics_calculated_with_progress()
         
         return jsonify({"status": "completed"})
