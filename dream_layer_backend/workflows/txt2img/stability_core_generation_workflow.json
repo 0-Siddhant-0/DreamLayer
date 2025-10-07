@@ -5,9 +5,9 @@
       "inputs": {
         "prompt": "beautiful",
         "aspect_ratio": "1:1",
-        "style_preset": "cinematic",
+        "style_preset": "photographic",
         "seed": 0,
-        "negative_prompt": "ugly",
+        "negative_prompt": "blurry, low-quality, jpeg artifacts, text, watermark, signature, artist name, extra objects, multiple views, cropped, out of frame, deformed, disfigured, complex background, artistic, stylized, cartoon, illustration, painting",
         "batch_size": 1
       }
     },
@@ -26,7 +26,7 @@
       "stability_sd_turbo": "StabilityStableImageUltraNode"
     },
     "core_settings": {
-      "prompt": "Main generation prompt",
+      "prompt": "Main generation prompt. Should be a simple list of ground_truth objects.",
       "aspect_ratio": "Image aspect ratio",
       "style_preset": "Style preset",
       "seed": "Random seed (0 for random)",
